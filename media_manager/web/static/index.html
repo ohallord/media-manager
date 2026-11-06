@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="system">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Media Manager Web Portal</title>
+    <link rel="icon" type="image/svg+xml" href="/static/img/logo.svg">
+    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/main.css?v=shelf8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container" style="display: none;">
+        <header class="shelf-bar">
+            <a class="shelf-brand" href="#inventory">
+                <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+                    <defs><mask id="mm-play-header"><rect width="64" height="64" fill="#fff"/><path d="M28.5 23 L36 30 L28.5 37 Z" fill="#000"/></mask></defs>
+                    <g fill="currentColor">
+                        <rect x="13" y="25" width="9" height="21" rx="2"/>
+                        <rect x="25" y="14" width="13" height="32" rx="2" mask="url(#mm-play-header)"/>
+                        <rect x="41" y="22" width="8" height="24" rx="2" transform="rotate(-8 49 46)"/>
+                        <rect x="10" y="48" width="44" height="4" rx="2"/>
+                    </g>
+                </svg>
+                <span>Media Manager</span>
+            </a>
+            <form class="shelf-search" id="top-search">
+                <input id="top-search-input" class="search-input" type="search" placeholder="Find a title" aria-label="Find a title">
+            </form>
+            <nav class="shelf-nav" aria-label="Main">
+                <a href="#inventory" class="nav-item active" id="nav-inventory">Library</a>
+                <a href="#arr-search" class="nav-item" id="nav-find">Find</a>
+                <a href="#my-requests" class="nav-item" id="nav-my-requests">Requests</a>
+                <a href="#calendar" class="nav-item" id="nav-calendar">Calendar</a>
+                <a href="#help" class="nav-item" id="nav-help">Help</a>
+                <a href="#admin" class="nav-item admin-only" id="nav-admin">Admin</a>
+            </nav>
+            <div class="shelf-tools">
+                <div class="theme-switcher">
+                    <button class="theme-btn" id="theme-btn-light" title="Light">Light</button>
+                    <button class="theme-btn" id="theme-btn-dark" title="Dark">Dark</button>
+                    <button class="theme-btn active" id="theme-btn-system" title="System">System</button>
+                </div>
+                <div class="user-profile" id="user-profile-widget">
+                    <span id="user-display-name">Guest</span>
+                    <button id="auth-action-btn" class="btn-sm">Login</button>
+                </div>
+                <div class="app-version" id="app-version"></div>
+            </div>
+        </header>
+        <nav class="shelf-subnav" id="find-nav" hidden aria-label="Find">
+            <a href="#arr-search" class="nav-item" id="nav-arr-search">Search</a>
+            <a href="#upcoming" class="nav-item" id="nav-upcoming">Coming Soon</a>
+            <a href="#trending" class="nav-item" id="nav-trending">Trending</a>
+        </nav>
+        <nav class="shelf-subnav" id="admin-nav" hidden aria-label="Admin">
+            <a href="#admin" class="nav-item admin-only" id="nav-admin-setup">Setup</a>
+            <a href="#paths" class="nav-item admin-only" id="nav-paths">Paths</a>
+            <a href="#users" class="nav-item admin-only" id="nav-users">Users</a>
+            <a href="#playback" class="nav-item admin-only" id="nav-playback">Playback</a>
+            <a href="#downloads" class="nav-item admin-only" id="nav-downloads">Downloads</a>
+            <a href="#duplicates" class="nav-item admin-only" id="nav-duplicates">Duplicates</a>
+            <a href="#cleanup" class="nav-item admin-only" id="nav-cleanup">Cleanup</a>
+            <a href="#transcode" class="nav-item admin-only" id="nav-transcode">H.265</a>
+            <a href="#logs" class="nav-item admin-only" id="nav-logs">Logs</a>
+        </nav>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title" id="page-title">Library</div>
+                <div class="header-actions">
+                    <button id="rescan-btn" class="btn btn-secondary">Rescan Library</button>
+                </div>
+            </header>
+
+            <!-- Dynamic View Containers -->
+            <section id="view-inventory" class="view-section active">
+                <div class="type-tabs-container">
+                    <button class="type-tab-btn active" data-type="movie" id="tab-movie">Movies <span class="badge" id="count-movie"></span></button>
+                    <button class="type-tab-btn" data-type="tv" id="tab-tv">TV <span class="badge" id="count-tv"></span></button>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="inventory-search-box">
+                        <svg class="search-box-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="search-input" class="search-input" placeholder="Search library by title, path, resolution, or codec...">
+                    </div>
+                    <select id="filter-resolution" class="select-input">
+                        <option value="">All Resolutions</option>
+                        <option value="4K">4K Ultra HD</option>
+                        <option value="1080p">1080p Full HD</option>
+                        <option value="720p">720p HD</option>
+                        <option value="SD">Standard Def (SD)</option>
+                    </select>
+                </div>
+
+                <div class="scoring-guide-card collapsed" id="scoring-guide-inv"></div>
+
+                <!-- Mobile & Tablet Horizontal A-Z Quick Jump Bar -->
+                <div class="az-jump-strip-horizontal" id="az-jump-strip-horizontal">
+                    <button class="az-letter-btn active" data-letter="">ALL</button>
+                    <button class="az-letter-btn" data-letter="#">#</button>
+                    <button class="az-letter-btn" data-letter="A">A</button>
+                    <button class="az-letter-btn" data-letter="B">B</button>
+                    <button class="az-letter-btn" data-letter="C">C</button>
+                    <button class="az-letter-btn" data-letter="D">D</button>
+                    <button class="az-letter-btn" data-letter="E">E</button>
+                    <button class="az-letter-btn" data-letter="F">F</button>
+                    <button class="az-letter-btn" data-letter="G">G</button>
+                    <button class="az-letter-btn" data-letter="H">H</button>
+                    <button class="az-letter-btn" data-letter="I">I</button>
+                    <button class="az-letter-btn" data-letter="J">J</button>
+                    <button class="az-letter-btn" data-letter="K">K</button>
+                    <button class="az-letter-btn" data-letter="L">L</button>
+                    <button class="az-letter-btn" data-letter="M">M</button>
+                    <button class="az-letter-btn" data-letter="N">N</button>
+                    <button class="az-letter-btn" data-letter="O">O</button>
+                    <button class="az-letter-btn" data-letter="P">P</button>
+                    <button class="az-letter-btn" data-letter="Q">Q</button>
+                    <button class="az-letter-btn" data-letter="R">R</button>
+                    <button class="az-letter-btn" data-letter="S">S</button>
+                    <button class="az-letter-btn" data-letter="T">T</button>
+                    <button class="az-letter-btn" data-letter="U">U</button>
+                    <button class="az-letter-btn" data-letter="V">V</button>
+                    <button class="az-letter-btn" data-letter="W">W</button>
+                    <button class="az-letter-btn" data-letter="X">X</button>
+                    <button class="az-letter-btn" data-letter="Y">Y</button>
+                    <button class="az-letter-btn" data-letter="Z">Z</button>
+                </div>
+
+                <div class="inventory-layout">
+                    <div class="inventory-grid" id="inventory-container">
+                        <div class="loading-spinner">Loading media items...</div>
+                    </div>
+
+                    <!-- Alphabet A-Z Quick Jump Strip (Right Side Desktop) -->
+                    <div class="az-jump-strip" id="az-jump-strip">
+                        <button class="az-letter-btn active" data-letter="">ALL</button>
+                        <button class="az-letter-btn" data-letter="#">#</button>
+                        <button class="az-letter-btn" data-letter="A">A</button>
+                        <button class="az-letter-btn" data-letter="B">B</button>
+                        <button class="az-letter-btn" data-letter="C">C</button>
+                        <button class="az-letter-btn" data-letter="D">D</button>
+                        <button class="az-letter-btn" data-letter="E">E</button>
+                        <button class="az-letter-btn" data-letter="F">F</button>
+                        <button class="az-letter-btn" data-letter="G">G</button>
+                        <button class="az-letter-btn" data-letter="H">H</button>
+                        <button class="az-letter-btn" data-letter="I">I</button>
+                        <button class="az-letter-btn" data-letter="J">J</button>
+                        <button class="az-letter-btn" data-letter="K">K</button>
+                        <button class="az-letter-btn" data-letter="L">L</button>
+                        <button class="az-letter-btn" data-letter="M">M</button>
+                        <button class="az-letter-btn" data-letter="N">N</button>
+                        <button class="az-letter-btn" data-letter="O">O</button>
+                        <button class="az-letter-btn" data-letter="P">P</button>
+                        <button class="az-letter-btn" data-letter="Q">Q</button>
+                        <button class="az-letter-btn" data-letter="R">R</button>
+                        <button class="az-letter-btn" data-letter="S">S</button>
+                        <button class="az-letter-btn" data-letter="T">T</button>
+                        <button class="az-letter-btn" data-letter="U">U</button>
+                        <button class="az-letter-btn" data-letter="V">V</button>
+                        <button class="az-letter-btn" data-letter="W">W</button>
+                        <button class="az-letter-btn" data-letter="X">X</button>
+                        <button class="az-letter-btn" data-letter="Y">Y</button>
+                        <button class="az-letter-btn" data-letter="Z">Z</button>
+                    </div>
+                </div>
+
+                <div class="pagination-bar" id="pagination-container"></div>
+            </section>
+
+            <section id="view-duplicates" class="view-section">
+                <div class="scoring-guide-card collapsed" id="scoring-guide-dup"></div>
+
+                <div id="duplicates-container">
+                    <div class="loading-spinner">Loading duplicate groups...</div>
+                </div>
+            </section>
+
+            <section id="view-cleanup" class="view-section">
+                <div class="section-card mb-3" style="padding: 1rem 1.25rem;">
+                    <div id="cleanup-wizard-steps" style="display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.85rem;"></div>
+                </div>
+                <div id="cleanup-wizard-container">
+                    <div class="loading-spinner">Loading...</div>
+                </div>
+                <div id="empty-files-card" class="section-card mt-3" style="padding: 1rem 1.25rem;"></div>
+            </section>
+
+            <section id="view-transcode" class="view-section">
+                <div id="transcode-container">
+                    <div class="loading-spinner">Loading...</div>
+                </div>
+            </section>
+
+            <section id="view-arr-search" class="view-section">
+                <div class="search-hero-card">
+                    <div class="search-hero-badge">
+                        <span class="pulse-dot"></span> Local & Integration Search
+                    </div>
+                    <h2 class="search-hero-title">Discover & Add Media</h2>
+                    <p class="search-hero-subtitle">Smart local-first search. Instantly queries your library, Radarr (Movies), or Sonarr (TV Shows).</p>
+                    
+                    <div class="search-tabs-pills">
+                        <button class="search-pill-btn search-type-tab-btn active" data-search-type="movie" id="search-tab-movie">
+                            <span>🎬</span> Movie (Radarr)
+                        </button>
+                        <button class="search-pill-btn search-type-tab-btn" data-search-type="tv" id="search-tab-tv">
+                            <span>📺</span> TV Show (Sonarr)
+                        </button>
+                    </div>
+
+                    <div class="search-input-wrapper">
+                        <div class="search-input-icon">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        </div>
+                        <input type="text" id="arr-search-input" class="modern-search-field" placeholder="Enter title (e.g., Inception, Breaking Bad)..." autocomplete="off">
+                        <button id="arr-search-btn" class="search-submit-btn">
+                            <span>Search</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="arr-results-container" class="grid-cards mt-4"></div>
+            </section>
+
+            <section id="view-downloads" class="view-section">
+                <div class="section-card">
+                    <h3>Active Downloads & Sync Status</h3>
+                    <div id="downloads-container">
+                        <p class="muted">No active downloads or SABnzbd not connected.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-calendar" class="view-section">
+                <div class="section-card">
+                    <div class="calendar-section-header">
+                        <h3 class="calendar-section-title">
+                            <span>📅</span> Media Release Calendar
+                        </h3>
+                        <span class="calendar-section-meta">Showing 30 days window (Sonarr & Radarr)</span>
+                    </div>
+                    <div id="calendar-container">
+                        <div class="loading-spinner">Loading upcoming releases...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-upcoming" class="view-section">
+                <div class="search-hero-card">
+                    <div class="search-hero-badge">
+                        <span class="pulse-dot"></span> Powered by TMDb
+                    </div>
+                    <h2 class="search-hero-title" id="upcoming-hero-title">Coming Soon to Theaters & Streaming</h2>
+                    <p class="search-hero-subtitle" id="upcoming-hero-subtitle">Upcoming theatrical and digital releases from Netflix, Apple TV+, Disney+, Hulu, and Paramount+.</p>
+
+                    <div class="search-tabs-pills">
+                        <button class="search-pill-btn upcoming-type-tab-btn active" data-upcoming-type="movie" id="upcoming-type-movie">🎬 Movies</button>
+                        <button class="search-pill-btn upcoming-type-tab-btn" data-upcoming-type="tv" id="upcoming-type-tv">📺 TV Shows</button>
+                    </div>
+
+                    <div class="search-tabs-pills" id="upcoming-days-pills">
+                        <button class="search-pill-btn upcoming-days-tab-btn active" data-days="30">Next 30 Days</button>
+                        <button class="search-pill-btn upcoming-days-tab-btn" data-days="60">Next 60 Days</button>
+                        <button class="search-pill-btn upcoming-days-tab-btn" data-days="90">Next 90 Days</button>
+                        <button class="search-pill-btn upcoming-days-tab-btn" data-days="120">Next 120 Days</button>
+                    </div>
+
+                    <div class="search-tabs-pills">
+                        <button class="search-pill-btn upcoming-view-tab-btn active" data-view="list" id="upcoming-view-list">☰ List</button>
+                        <button class="search-pill-btn upcoming-view-tab-btn" data-view="calendar" id="upcoming-view-calendar">🗓 Calendar</button>
+                    </div>
+                </div>
+                <div id="upcoming-movies-container" class="mt-4"></div>
+                <div id="upcoming-tv-container" class="mt-4" style="display: none;"></div>
+                <div id="upcoming-calendar-container" class="mt-4" style="display: none;"></div>
+            </section>
+
+            <section id="view-trending" class="view-section">
+                <div class="search-hero-card">
+                    <div class="search-hero-badge">
+                        <span class="pulse-dot"></span> Powered by TMDb
+                    </div>
+                    <h2 class="search-hero-title">Trending Now</h2>
+                    <p class="search-hero-subtitle">What's popular right now, regardless of release date. For upcoming releases, see Coming Soon.</p>
+
+                    <div class="search-tabs-pills">
+                        <button class="search-pill-btn trending-type-tab-btn active" data-trending-type="movie">🎬 Movies</button>
+                        <button class="search-pill-btn trending-type-tab-btn" data-trending-type="tv">📺 TV Shows</button>
+                    </div>
+                    <div class="search-tabs-pills">
+                        <button class="search-pill-btn trending-window-tab-btn" data-trending-window="day">Today</button>
+                        <button class="search-pill-btn trending-window-tab-btn active" data-trending-window="week">This Week</button>
+                    </div>
+                </div>
+                <div id="trending-container" class="mt-4"></div>
+            </section>
+
+            <section id="view-my-requests" class="view-section">
+                <div class="search-hero-card">
+                    <div class="search-hero-badge">
+                        <span class="pulse-dot"></span> Your Requests
+                    </div>
+                    <h2 class="search-hero-title">My Requests</h2>
+                    <p class="search-hero-subtitle">Everything you've requested, and whether it's still being searched for, actively downloading, or already available.</p>
+                </div>
+                <div id="my-requests-container" class="mt-4"></div>
+            </section>
+
+            <section id="view-help" class="view-section">
+                <div class="search-hero-card">
+                    <div class="search-hero-badge">Tips &amp; how-to</div>
+                    <h2 class="search-hero-title">Help</h2>
+                    <p class="search-hero-subtitle">How to use this portal. Send someone <code>https://media.example.com/#help</code> — they sign in, then land here.</p>
+                </div>
+                <div class="help-page">
+                    <nav class="help-toc section-card" aria-label="Help topics">
+                        <h3>Jump to</h3>
+                        <ul>
+                            <li><a href="#help/layout">Where things are</a></li>
+                            <li><a href="#help/search">Search &amp; add a title</a></li>
+                            <li><a href="#help/redownload">Re-download something that will not play</a></li>
+                            <li><a href="#help/requests">My Requests &amp; Downloads</a></li>
+                            <li><a href="#help/discover">Calendar, Coming Soon, Trending</a></li>
+                            <li><a href="#help/library">Library &amp; duplicates</a></li>
+                            <li><a href="#help/account">Sign-in, theme, password</a></li>
+                        </ul>
+                    </nav>
+
+                    <article id="help-layout" class="section-card help-article">
+                        <h3>Where things are</h3>
+                        <p>The top bar is <strong>Library</strong>, <strong>Find</strong>, <strong>Requests</strong>, <strong>Calendar</strong>, <strong>Help</strong>, and <strong>Admin</strong> for operators. On a phone those links sit on a bar at the bottom of the screen. Household accounts do not see Admin.</p>
+                        <ul>
+                            <li><strong>Find</strong> holds Search, Coming Soon, and Trending.</li>
+                            <li><strong>Admin</strong> holds Setup, Paths, Users, Playback, Downloads, Duplicates, Cleanup, H.265, and Logs.</li>
+                        </ul>
+                    </article>
+
+                    <article id="help-search" class="section-card help-article">
+                        <h3>Search &amp; add a title</h3>
+                        <ol>
+                            <li>Open <strong>Find</strong>, then Search.</li>
+                            <li>Choose <strong>Movies</strong> or <strong>TV Shows</strong>.</li>
+                            <li>Type the title and pick the correct year / poster.</li>
+                            <li>Confirm add. Leave <strong>Grab now</strong> checked if you want it to start downloading immediately.</li>
+                        </ol>
+                        <p class="muted">Any signed-in user can add. There is no extra approval step.</p>
+                    </article>
+
+                    <article id="help-redownload" class="section-card help-article">
+                        <h3>Re-download a title that will not play (TV / Colt’s TV, etc.)</h3>
+                        <p>Use this when a movie is already in the library but a TV or app cannot play it (bad encode, Dolby Vision Profile 5, and similar).</p>
+                        <ol>
+                            <li>Open <strong>Find</strong>, then Search. Choose <strong>Movies</strong> (or TV if it is a series).</li>
+                            <li>Search the exact title.</li>
+                            <li>On the result you already have, tap <strong>Search &amp; Redownload</strong> and confirm.</li>
+                            <li>If nothing new downloads, Radarr may think the current file is “good enough.” Delete that file on <strong>Library</strong> first, then Search &amp; Redownload again.</li>
+                            <li>An operator watches <strong>Admin → Downloads</strong> until it finishes, then refresh the TV app / library.</li>
+                        </ol>
+                        <p class="muted">Share this section: <code>https://media.example.com/#help/redownload</code></p>
+                    </article>
+
+                    <article id="help-requests" class="section-card help-article">
+                        <h3>My Requests &amp; Downloads</h3>
+                        <p><strong>My Requests</strong> lists titles <em>you</em> added and whether they are still requested, downloading, or already in the library.</p>
+                        <p><strong>Downloads</strong> is under <strong>Admin</strong>. It shows SABnzbd (NZB job), Syncthing, and Radarr/Sonarr import (grab → file on disk). Those are different stages — the NZB can finish while Radarr is still importing.</p>
+                    </article>
+
+                    <article id="help-discover" class="section-card help-article">
+                        <h3>Calendar vs Coming Soon vs Trending</h3>
+                        <ul>
+                            <li><strong>Calendar</strong> — upcoming dates for titles already in Radarr/Sonarr (episode air dates, movie digital dates).</li>
+                            <li><strong>Coming Soon</strong> — new theatrical movies and new TV series premieres in the next 30–120 days (from TMDb).</li>
+                            <li><strong>Trending</strong> — popular right now, any release date.</li>
+                        </ul>
+                        <p>Tap a poster for details, trailer, cast, and <strong>More Like This</strong>.</p>
+                    </article>
+
+                    <article id="help-library" class="section-card help-article">
+                        <h3>Library &amp; duplicates</h3>
+                        <p><strong>Library</strong> is everything scanned from disk. Filter by Movies/TV, resolution, or letter. <strong>Rescan Library</strong> walks the folders again.</p>
+                        <p><strong>Duplicates</strong> is under <strong>Admin</strong>. It groups extra copies and highlights the higher quality score (TRaSH-style). Deleting a worse copy is manual — the app does not auto-wipe extras.</p>
+                    </article>
+
+                    <article id="help-account" class="section-card help-article">
+                        <h3>Account</h3>
+                        <ul>
+                            <li>Change password or add a passkey with <strong>Password</strong> next to your name.</li>
+                            <li>Theme: Light, Dark, or System in the top bar.</li>
+                            <li>Forgot password only works if an admin configured email (SMTP).</li>
+                        </ul>
+                    </article>
+                </div>
+            </section>
+
+            <section id="view-logs" class="view-section">
+                <div class="section-card">
+                    <div class="watcher-heartbeat mb-2" id="logs-watcher-heartbeat"></div>
+                    <div class="log-controls" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <div class="btn-group" style="display: flex; gap: 0.25rem;">
+                                <button id="btn-log-last-75" class="btn btn-secondary btn-sm active" style="font-size: 0.85rem;">📜 Last 75 Lines</button>
+                                <button id="btn-log-live" class="btn btn-secondary btn-sm" style="font-size: 0.85rem;">🔴 Live Stream</button>
+                            </div>
+                            <select id="log-count-select" class="form-select form-select-sm" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.85rem; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                                <option value="25">25 Lines</option>
+                                <option value="75" selected>75 Lines</option>
+                                <option value="150">150 Lines</option>
+                                <option value="300">300 Lines</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; flex: 1; max-width: 400px;">
+                            <input type="text" id="log-filter-input" placeholder="Filter log text..." style="flex: 1; font-size: 0.85rem; padding: 0.35rem 0.6rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary);">
+                            <button id="btn-clear-logs" class="btn btn-secondary btn-sm" style="font-size: 0.85rem;">Clear</button>
+                        </div>
+                    </div>
+                    <div class="log-terminal" id="log-terminal-box" style="height: 520px; overflow-y: auto; background: var(--bg-primary); color: var(--text-secondary); font-family: monospace; font-size: 0.82rem; padding: 1rem; border: 1px solid var(--border-color); line-height: 1.4;">
+                        <div class="log-line text-muted">Loading logs...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-admin" class="view-section">
+                <div class="section-card mb-3">
+                    <h3>Host watcher</h3>
+                    <p class="muted mb-2" style="font-size: 0.9rem;">The k3s web app and <code>media-manager-watcher.service</code> share this database when <code>DB_PATH</code> matches. A beat every ~30s means the host process is alive.</p>
+                    <div class="watcher-heartbeat" id="admin-watcher-heartbeat"></div>
+                </div>
+                <div class="section-card mb-3">
+                    <h3>Connections</h3>
+                    <p class="muted mb-3" style="font-size: 0.9rem;">Open a service to set its URL and key.</p>
+                    <div id="admin-integrations-list"></div>
+                </div>
+            </section>
+
+            <section id="view-paths" class="view-section">
+                <div class="section-card mb-3">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 style="margin: 0;">Monitored directories</h3>
+                        <button class="btn btn-secondary" onclick="loadAdminDirectories()" style="padding: 4px 10px; font-size: 0.75rem;">Refresh</button>
+                    </div>
+                    <p class="muted mb-3" style="font-size: 0.9rem;">Paths scanned on this server. They must already exist.</p>
+                    <div id="admin-directories-list" style="margin-bottom: 1.5rem;"></div>
+                    <form id="admin-add-directory-form" style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" id="admin-new-directory-path" required placeholder="e.g. /mnt/Movies3/" class="search-input" style="flex: 1; font-size: 0.9rem;">
+                        <button type="submit" class="btn btn-primary" style="padding: 0.65rem 1.25rem;">Add directory</button>
+                    </form>
+                </div>
+            </section>
+
+            <section id="view-users" class="view-section">
+                <div class="section-card mb-3">
+                    <h3>User accounts</h3>
+                    <div id="admin-users-list"></div>
+                    <button id="create-user-modal-btn" class="btn btn-secondary mt-3">Add user</button>
+                </div>
+            </section>
+
+            <section id="view-playback" class="view-section">
+                <div class="section-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                        <h3 style="margin: 0;">Playback</h3>
+                        <button class="btn btn-secondary" onclick="loadAdminPlayback()" style="padding: 4px 10px; font-size: 0.75rem;">Refresh</button>
+                    </div>
+                    <p class="muted mb-3" style="font-size: 0.9rem;">Play count and last play for movies and series. Filter by name. Sort by a column header.</p>
+                    <input type="search" id="admin-playback-filter" class="search-input mb-2" placeholder="Filter by name" oninput="window.filterAdminPlayback(this.value)" style="max-width: 24rem;">
+                    <div id="admin-playback-list"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="modal-backdrop" id="auth-modal" style="display: flex;">
+        <div class="modal-card">
+            <img class="auth-logo" src="/static/img/logo.svg" alt="" width="56" height="56">
+            <h3>Account Sign In</h3>
+            <form id="login-form">
+                <div class="form-group mb-2">
+                    <label style="display: block; font-size: 0.85rem; margin-bottom: 0.25rem;">Username</label>
+                    <input type="text" id="login-username" required class="search-input" style="width: 100%;">
+                </div>
+                <div class="form-group mb-3">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                        <label style="font-size: 0.85rem; margin: 0;">Password</label>
+                        <a href="#" id="forgot-password-link" style="font-size: 0.75rem; color: var(--accent); text-decoration: none;">Forgot Password?</a>
+                    </div>
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <input type="password" id="login-password" required class="search-input" style="width: 100%; padding-right: 2.5rem;">
+                        <button type="button" onclick="window.togglePasswordVisibility('login-password', this)" style="position: absolute; right: 8px; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; font-size: 1rem; line-height: 1; display: flex; align-items: center; outline: none;">👁️</button>
+                    </div>
+                </div>
+                <div class="form-actions" style="display: flex; gap: 0.5rem; flex-direction: column;">
+                    <button type="submit" class="btn btn-primary">Login with Password</button>
+                    <button type="button" id="passkey-login-btn" class="btn btn-secondary">🔑 Sign in with Passkey</button>
+                </div>
+            </form>
+            <button class="modal-close-btn" id="close-auth-modal" style="display: none;">×</button>
+        </div>
+    </div>
+
+    <script src="/static/js/utils.js?v=shelf2"></script>
+    <script src="/static/js/theme.js?v=10.3"></script>
+    <script src="/static/js/auth.js?v=shelf1"></script>
+    <script src="/static/js/inventory.js?v=shelf2"></script>
+    <script src="/static/js/duplicates.js?v=10.2"></script>
+    <script src="/static/js/cleanup_wizard.js?v=1.0"></script>
+    <script src="/static/js/empty_files.js?v=1.1"></script>
+    <script src="/static/js/transcode.js?v=1.1"></script>
+    <script src="/static/js/media_search.js?v=shelf2"></script>
+    <script src="/static/js/media_detail.js?v=shelf2"></script>
+    <script src="/static/js/downloads.js?v=10.5"></script>
+    <script src="/static/js/calendar.js?v=11.2"></script>
+    <script src="/static/js/media_calendar_grid.js?v=1.3"></script>
+    <script src="/static/js/upcoming_movies.js?v=10.6"></script>
+    <script src="/static/js/upcoming_tv.js?v=1.3"></script>
+    <script src="/static/js/my_requests.js?v=1.3"></script>
+    <script src="/static/js/trending.js?v=1.3"></script>
+    <script src="/static/js/help.js?v=1.0"></script>
+    <script src="/static/js/logs.js?v=10.2"></script>
+    <script src="/static/js/admin_users.js?v=1.2.3"></script>
+    <script src="/static/js/admin_integrations.js?v=10.4"></script>
+    <script src="/static/js/admin_playback.js?v=1.0"></script>
+    <script>
+        window.loadAdminView = function() {
+            if (window.loadAdminIntegrations) window.loadAdminIntegrations();
+        };
+
+        // SPA View Router
+        function navigateTo(viewId, topic) {
+            if ((window.ADMIN_ONLY_VIEWS || []).includes(viewId) && !(window.isAdminUser && window.isAdminUser())) {
+                // Non-admins never see these; before login resolves, wait for updateUserUI to re-navigate.
+                if (window.currentUser) location.hash = '#inventory';
+                return;
+            }
+            const titles = {
+                inventory: 'Library',
+                duplicates: 'Duplicates',
+                cleanup: 'Cleanup Wizard',
+                transcode: 'H.265 Migration',
+                'arr-search': 'Search & Add',
+                downloads: 'Downloads',
+                calendar: 'Calendar',
+                upcoming: 'Coming Soon',
+                trending: 'Trending',
+                'my-requests': 'My Requests',
+                help: 'Help',
+                logs: 'Logs',
+                admin: 'Setup',
+                paths: 'Paths',
+                users: 'Users',
+                playback: 'Playback',
+            };
+            const targetView = document.getElementById('view-' + viewId);
+            if (!targetView) {
+                if (viewId !== 'inventory') navigateTo('inventory');
+                return;
+            }
+
+            const findViews = ['arr-search', 'upcoming', 'trending'];
+            const adminViews = ['admin', 'paths', 'users', 'playback', 'downloads', 'duplicates', 'cleanup', 'transcode', 'logs'];
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            const targetNav = document.getElementById('nav-' + viewId);
+            targetView.classList.add('active');
+            if (targetNav) targetNav.classList.add('active');
+            if (findViews.indexOf(viewId) !== -1) {
+                const find = document.getElementById('nav-find');
+                if (find) find.classList.add('active');
+            }
+            if (adminViews.indexOf(viewId) !== -1) {
+                const admin = document.getElementById('nav-admin');
+                if (admin) admin.classList.add('active');
+            }
+            if (viewId === 'admin') {
+                const setup = document.getElementById('nav-admin-setup');
+                if (setup) setup.classList.add('active');
+            }
+            const findNav = document.getElementById('find-nav');
+            const adminNav = document.getElementById('admin-nav');
+            if (findNav) findNav.hidden = findViews.indexOf(viewId) === -1;
+            if (adminNav) adminNav.hidden = adminViews.indexOf(viewId) === -1;
+
+            const label = titles[viewId] || 'Media Manager';
+            const pageTitle = document.getElementById('page-title');
+            if (pageTitle) pageTitle.textContent = label;
+            document.title = label + ' · Media Manager';
+
+            const rescanBtn = document.getElementById('rescan-btn');
+            if (rescanBtn) rescanBtn.style.display = (viewId === 'inventory') ? '' : 'none';
+
+            // Load view content
+            if (viewId === 'inventory') {
+                window.loadInventory();
+                if (window.loadInventoryCounts) window.loadInventoryCounts();
+            }
+            if (viewId === 'duplicates') window.loadDuplicates();
+            if (viewId === 'cleanup' && window.loadCleanupWizard) window.loadCleanupWizard();
+            if (viewId === 'cleanup' && window.loadEmptyFiles) window.loadEmptyFiles();
+            if (viewId === 'transcode' && window.loadTranscodeView) window.loadTranscodeView();
+            if (viewId === 'logs') window.initLogStream();
+            if (viewId === 'downloads') window.loadDownloads();
+            if (viewId === 'calendar') window.loadCalendar();
+            if (viewId === 'upcoming') window.loadUpcomingMovies();
+            if (viewId === 'trending') window.loadTrending();
+            if (viewId === 'my-requests') window.loadMyRequests();
+            if (viewId === 'admin') window.loadAdminView();
+            if (viewId === 'paths' && window.loadAdminDirectories) window.loadAdminDirectories();
+            if (viewId === 'users' && window.loadAdminUsers) window.loadAdminUsers();
+            if (viewId === 'playback' && window.loadAdminPlayback) window.loadAdminPlayback();
+
+            if (viewId === 'help' && topic && window.scrollHelpTopic) {
+                requestAnimationFrame(function () { window.scrollHelpTopic(topic); });
+            }
+
+        }
+
+        window.addEventListener('hashchange', () => {
+            const parsed = (window.parseAppHash || function (h) {
+                return { viewId: (h || '').replace('#', '') || 'inventory', topic: null };
+            })(location.hash);
+            navigateTo(parsed.viewId, parsed.topic);
+        });
+
+        document.getElementById('top-search').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const q = document.getElementById('top-search-input').value.trim();
+            const input = document.getElementById('arr-search-input');
+            if (input) input.value = q;
+            if ((location.hash || '').replace('#', '').split(/[/?]/)[0] !== 'arr-search') {
+                location.hash = '#arr-search';
+            }
+            if (q && typeof performUnifiedSearch === 'function') performUnifiedSearch();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const parsed = (window.parseAppHash || function (h) {
+                return { viewId: (h || '').replace('#', '') || 'inventory', topic: null };
+            })(location.hash);
+            navigateTo(parsed.viewId, parsed.topic);
+        });
+    </script>
+</body>
+</html>

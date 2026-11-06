@@ -1,0 +1,71 @@
+replicaCount: 1
+
+image:
+  repository: media-manager
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 8088
+
+env:
+  WEB_HOST: "0.0.0.0"
+  WEB_PORT: "8088"
+  RP_ID: "media.local"
+  RP_NAME: "Media Manager Portal"
+  # Set to "true" to use the PostgreSQL secret below instead of the
+  # SQLite file at DB_PATH (default: SQLite on the config volume).
+  USE_POSTGRES: "false"
+  DB_PATH: "/config/media.db"
+  # Must match the token the host watcher sends (media_manager/heartbeat.py default).
+  WATCHER_HEARTBEAT_TOKEN: "media-manager-watcher"
+
+# Rendered into the chart Secret. Empty values are skipped. Set them at
+# install time, e.g.:
+#   --set-string secrets.JWT_SECRET="$(openssl rand -hex 32)"
+#   --set-string secrets.INITIAL_ADMIN_PASSWORD="$(openssl rand -base64 18)"
+# INITIAL_ADMIN_PASSWORD has no default: without it no admin account is
+# created. POSTGRES_URI is only read if env.USE_POSTGRES is "true".
+secrets:
+  JWT_SECRET: ""
+  INITIAL_ADMIN_PASSWORD: ""
+  POSTGRES_URI: ""
+
+# Config/database volume - always mounted at /config for the SQLite DB
+# (see env.DB_PATH above) and other persistent app state.
+configPersistence:
+  enabled: true
+  claimName: media-manager-config-pvc
+  size: 1Gi
+  mountPath: /config
+
+# Your actual media library directories. Add one entry per directory you
+# want mounted into the container - these should match whatever you set
+# MEDIA_DIRECTORIES / SOURCE_DIRECTORIES to (see docs/INSTALL.md) so the
+# app knows to scan/watch these same paths.
+mediaPersistence:
+  enabled: false
+  mounts: []
+    # - name: movies
+    #   mountPath: /media/Movies
+    #   claimName: movies-pvc
+    # - name: tvshows
+    #   mountPath: /media/TvShows
+    #   claimName: tvshows-pvc
+
+ingress:
+  enabled: false
+  annotations: {}
+  host: media.local
+  tls:
+    enabled: false
+    secretName: media-manager-tls
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

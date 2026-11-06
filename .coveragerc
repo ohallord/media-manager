@@ -1,0 +1,9 @@
+[run]
+source = media_manager
+concurrency = thread,greenlet
+omit =
+    */__pycache__/*
+
+[report]
+show_missing = True
+skip_empty = True

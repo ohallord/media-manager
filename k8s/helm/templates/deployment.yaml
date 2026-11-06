@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "media-manager.fullname" . }}
+  labels:
+    {{- include "media-manager.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "media-manager.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "media-manager.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: media-manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.env.WEB_PORT }}
+              name: http
+          {{- if not .Values.secrets.JWT_SECRET }}
+          {{- fail "secrets.JWT_SECRET is required (e.g. --set-string secrets.JWT_SECRET=$(openssl rand -hex 32))" }}
+          {{- end }}
+          # Every non-empty key in .Values.secrets (JWT_SECRET,
+          # INITIAL_ADMIN_PASSWORD, POSTGRES_URI) becomes an env var.
+          envFrom:
+            - configMapRef:
+                name: {{ include "media-manager.fullname" . }}-config
+            - secretRef:
+                name: {{ include "media-manager.fullname" . }}-secrets
+          volumeMounts:
+            {{- if .Values.configPersistence.enabled }}
+            - name: config
+              mountPath: {{ .Values.configPersistence.mountPath }}
+            {{- end }}
+            {{- range .Values.mediaPersistence.mounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        {{- if .Values.configPersistence.enabled }}
+        - name: config
+          persistentVolumeClaim:
+            claimName: {{ .Values.configPersistence.claimName }}
+        {{- end }}
+        {{- range .Values.mediaPersistence.mounts }}
+        - name: {{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ .claimName }}
+        {{- end }}

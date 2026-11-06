@@ -1,0 +1,12 @@
+{{- if .Values.configPersistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.configPersistence.claimName }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.configPersistence.size }}
+{{- end }}

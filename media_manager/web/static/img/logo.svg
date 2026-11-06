@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Media Manager">
+  <!-- Library shelf: three spines on a shelf. The tall spine has a play
+       cutout (media); the right spine leans in (a new file being filed). -->
+  <defs>
+    <mask id="mm-play">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M28.5 23 L36 30 L28.5 37 Z" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#1a1714"/>
+  <g fill="#c4a574">
+    <rect x="13" y="25" width="9" height="21" rx="2"/>
+    <rect x="25" y="14" width="13" height="32" rx="2" mask="url(#mm-play)"/>
+    <rect x="41" y="22" width="8" height="24" rx="2" transform="rotate(-8 49 46)"/>
+    <rect x="10" y="48" width="44" height="4" rx="2"/>
+  </g>
+</svg>
