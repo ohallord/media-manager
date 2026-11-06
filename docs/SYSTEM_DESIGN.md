@@ -427,6 +427,12 @@ flowchart TD
 
 ---
 
+### Duplicate groups
+`quality.update_duplicate_groups` groups by `media_type:title` (plus
+`SxxEyy` for TV), keeps the highest `quality_score` as `best_media_id`, and
+flushes a new `DuplicateGroup` before linking items so they get its id on the
+same run (`tests/test_duplicate_group_first_link.py`).
+
 ## 14. Library Cleanup Wizard
 
 ```mermaid
@@ -623,6 +629,12 @@ flowchart TD
   no migration.
 
 ### 16.4 Job queue and worker API (phase 4)
+
+Singleton settings rows (`transcode_control` id `global`, and one
+`cleanup_settings` row per media type) are created on first use. The H.265
+and Cleanup pages fire several requests at once, so `get_or_create_control` /
+`get_or_create_settings` catch the `IntegrityError` from a lost insert race,
+roll back, and re-select the winner's row (`tests/test_get_or_create_race.py`).
 
 ```mermaid
 stateDiagram-v2

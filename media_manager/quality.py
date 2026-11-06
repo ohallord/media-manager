@@ -265,6 +265,10 @@ def update_duplicate_groups(protected_ids: Optional[Iterable[str]] = None):
                         total_count=len(group_items)
                     )
                     session.add(dup_group)
+                    # Flush so the new group has its id before items link to
+                    # it; otherwise they get duplicate_group_id=None until the
+                    # next run.
+                    session.flush()
                 else:
                     dup_group.media_title = best_item.title
                     dup_group.season_episode = se_label
