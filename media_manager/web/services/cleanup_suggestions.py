@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from media_manager.models import CleanupSettings, MediaItem
@@ -25,8 +26,8 @@ DEFAULT_STALE_AFTER_DAYS = 365
 
 
 async def get_or_create_settings(db: AsyncSession, media_type: str) -> CleanupSettings:
-    result = await db.execute(select(CleanupSettings).where(CleanupSettings.media_type == media_type))
-    settings = result.scalar_one_or_none()
+    query = select(CleanupSettings).where(CleanupSettings.media_type == media_type)
+    settings = (await db.execute(query)).scalar_one_or_none()
     if settings is None:
         settings = CleanupSettings(
             media_type=media_type,
@@ -34,7 +35,12 @@ async def get_or_create_settings(db: AsyncSession, media_type: str) -> CleanupSe
             stale_after_days=DEFAULT_STALE_AFTER_DAYS,
         )
         db.add(settings)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            # A concurrent first request created this media type's row first.
+            await db.rollback()
+            return (await db.execute(query)).scalar_one()
         await db.refresh(settings)
     return settings
 

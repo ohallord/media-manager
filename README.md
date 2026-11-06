@@ -9,7 +9,13 @@ Media Manager is a self-hosted web portal for a home movie and TV library. It
 has a FastAPI backend, a plain JavaScript single-page app, and SQLite or
 Postgres for storage.
 
-TODO(Dan): one or two sentences on why you built it, in your own words.
+I wanted one place to see and manage my media, and a way for friends and
+family to see what's on my servers or available to request. I also needed to
+keep an eye on my files and folders and find where I could save space.
+
+It started as a simple search-and-request page. Each time I asked what else it
+could handle, it grew: duplicate checks, a verified file mover, H.265
+conversion, and a feed of upcoming movies and TV shows.
 
 ## Key features
 
@@ -51,7 +57,29 @@ a configurable number of days after each swap.
 
 ## Screenshots
 
-TODO(Dan): add screenshots to `docs/screenshots/` and link them here.
+These come from a demo library of public-domain films and made-up shows.
+
+The library, with quality, codec, and play counts on each card:
+
+![Library view with movie cards](docs/screenshots/library.png)
+
+Duplicates ranked by quality score, with the copy to keep marked:
+
+![Duplicates page](docs/screenshots/duplicates.png)
+
+The mover's log trail for a verified copy, a skipped lower-quality file, and a failed check:
+
+![Logs page with mover events](docs/screenshots/logs.png)
+
+The H.265 dry-run report before anything is encoded:
+
+![H.265 migration dry-run report](docs/screenshots/h265.png)
+
+The cleanup wizard's thresholds, and the library on a phone:
+
+![Cleanup wizard settings](docs/screenshots/cleanup.png)
+
+<img src="docs/screenshots/mobile-library.png" width="320" alt="Library on a phone">
 
 ## How it fits together
 
@@ -170,6 +198,12 @@ CI runs the same commands on every push and fails below 90% line coverage.
 ## What I'd change
 
 TODO(Dan): write this yourself.
+
+## Legal use
+
+Media Manager is for organizing media you have the right to keep, such as discs
+you own or shows you recorded. It doesn't host or index content, and it isn't
+meant for piracy. Follow the copyright law where you live.
 
 ## License
 

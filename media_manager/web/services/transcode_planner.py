@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from media_manager.config import SOURCE_DIRECTORIES
@@ -74,11 +75,18 @@ async def update_settings(db: AsyncSession, media_type: str, updates: Dict[str, 
 
 
 async def get_or_create_control(db: AsyncSession) -> TranscodeControl:
-    row = (await db.execute(select(TranscodeControl).where(TranscodeControl.id == "global"))).scalar_one_or_none()
+    query = select(TranscodeControl).where(TranscodeControl.id == "global")
+    row = (await db.execute(query)).scalar_one_or_none()
     if row is None:
         row = TranscodeControl(id="global")
         db.add(row)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            # A concurrent first request (the H.265 page loads several at
+            # once) created the singleton between our SELECT and INSERT.
+            await db.rollback()
+            return (await db.execute(query)).scalar_one()
         await db.refresh(row)
     return row
 
