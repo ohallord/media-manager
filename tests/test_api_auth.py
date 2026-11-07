@@ -63,9 +63,26 @@ class TestApiAuth(unittest.TestCase):
         response = self.client.post("/api/v1/auth/bypass-2fa", json={"temp_token": "does-not-exist"})
         self.assertEqual(response.status_code, 404)
 
-    def test_forgot_password_unknown_username(self):
+    def test_forgot_password_unknown_username_is_indistinguishable(self):
+        # Security review 2026-11-07 HIGH 1: a 404 here enumerated usernames.
         response = self.client.post("/api/v1/auth/forgot-password", json={"username": "no-such-user"})
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "requires_verification")
+        self.assertIn("temp_token", data)
+        self.assertNotIn("method", data)
+
+        # The decoy token fails the same way a real token with a wrong code does.
+        resp = self.client.post(
+            "/api/v1/auth/reset-password",
+            json={"temp_token": data["temp_token"], "code": "123456", "new_password": "newpass123"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()["detail"], "Incorrect verification code.")
+
+    def test_codes_do_not_use_module_random(self):
+        from media_manager.web.api import auth as auth_module
+        self.assertFalse(hasattr(auth_module, "random"), "verification codes must come from secrets")
 
     def test_reset_password_invalid_token(self):
         response = self.client.post(
@@ -94,6 +111,8 @@ class TestApiAuthWithRealUser(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
         self.password = "InitialPass123"
+        from media_manager.web.api import auth as auth_module
+        getattr(auth_module, "CODE_ISSUE_LOG", {}).clear()
         asyncio.run(self._cleanup())
 
     def tearDown(self):
@@ -224,6 +243,64 @@ class TestApiAuthWithRealUser(unittest.TestCase):
         )
         self.assertEqual(relogin.status_code, 200)
 
+    def test_password_change_revokes_existing_tokens(self):
+        # Regression: a 30-day JWT stayed valid after the password changed.
+        asyncio.run(self._create_user())
+        old_token = self.client.post(
+            "/api/v1/auth/login", json={"username": self.USERNAME, "password": self.password}
+        ).json()["access_token"]
+        bearer = {"Authorization": f"Bearer {old_token}"}
+
+        browser = TestClient(app)  # its own cookie jar
+        changed = browser.post(
+            "/api/v1/auth/change-password",
+            json={"current_password": self.password, "new_password": "NewPass123"},
+            headers=bearer,
+        )
+        self.assertEqual(changed.status_code, 200)
+
+        stale = TestClient(app).get("/api/v1/auth/me", headers=bearer)
+        self.assertIsNone(stale.json()["user"])
+        # The browser that changed the password got a fresh cookie and stays signed in.
+        fresh = browser.get("/api/v1/auth/me")
+        self.assertEqual(fresh.json()["user"]["username"], self.USERNAME)
+
+    def test_inactive_user_cannot_log_in_or_use_token(self):
+        asyncio.run(self._create_user(is_active=False))
+        login = self.client.post(
+            "/api/v1/auth/login", json={"username": self.USERNAME, "password": self.password}
+        )
+        self.assertEqual(login.status_code, 403)
+
+        async def _user_id():
+            from sqlalchemy import select
+            async with AsyncSessionLocal() as db:
+                return (await db.execute(select(User.id).where(User.username == self.USERNAME))).scalar_one()
+        token = create_access_token({"sub": asyncio.run(_user_id()), "tv": 0})
+        me = TestClient(app).get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        self.assertIsNone(me.json()["user"])
+
+    def test_cookie_secure_behind_https_proxy(self):
+        asyncio.run(self._create_user())
+        creds = {"username": self.USERNAME, "password": self.password}
+        https = self.client.post("/api/v1/auth/login", json=creds, headers={"X-Forwarded-Proto": "https"})
+        self.assertIn("secure", https.headers["set-cookie"].lower())
+        plain = TestClient(app).post("/api/v1/auth/login", json=creds)
+        self.assertNotIn("secure", plain.headers["set-cookie"].lower())
+
+    def test_cookie_secure_env_override(self):
+        from unittest.mock import MagicMock, patch
+        import os
+        from media_manager.web.api.auth import cookie_secure
+        req = MagicMock()
+        req.url.scheme = "http"
+        req.headers = {}
+        with patch.dict(os.environ, {"COOKIE_SECURE": "true"}):
+            self.assertTrue(cookie_secure(req))
+        req.url.scheme = "https"
+        with patch.dict(os.environ, {"COOKIE_SECURE": "false"}):
+            self.assertFalse(cookie_secure(req))
+
     def test_must_change_password_blocks_other_routes(self):
         asyncio.run(self._create_user(must_change_password=True))
         login_resp = self.client.post(
@@ -248,7 +325,6 @@ class TestApiAuthWithRealUser(unittest.TestCase):
         self.assertEqual(forgot_resp.status_code, 200)
         forgot_data = forgot_resp.json()
         self.assertEqual(forgot_data["status"], "requires_verification")
-        self.assertEqual(forgot_data["method"], "email")
         temp_token = forgot_data["temp_token"]
         real_code = auth_module.PENDING_PASSWORD_RESET[temp_token]["code"]
 
@@ -276,9 +352,100 @@ class TestApiAuthWithRealUser(unittest.TestCase):
         self.assertEqual(relogin.status_code, 200)
 
     def test_forgot_password_no_contact_info(self):
+        # Same generic response as an unknown user: no account-existence oracle.
         asyncio.run(self._create_user(email=None, phone=None, two_factor_method="none"))
         response = self.client.post("/api/v1/auth/forgot-password", json={"username": self.USERNAME})
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "requires_verification")
+
+    def _forgot(self):
+        from media_manager.web.api import auth as auth_module
+        resp = self.client.post("/api/v1/auth/forgot-password", json={"username": self.USERNAME})
+        temp_token = resp.json()["temp_token"]
+        return temp_token, auth_module.PENDING_PASSWORD_RESET[temp_token]["code"]
+
+    def test_reset_password_locks_token_after_max_attempts(self):
+        # Security review 2026-11-07 HIGH 1: unlimited guesses against one token.
+        from media_manager.web.api import auth as auth_module
+        asyncio.run(self._create_user())
+        temp_token, real_code = self._forgot()
+        wrong = "000000" if real_code != "000000" else "111111"
+        for _ in range(auth_module.MAX_CODE_ATTEMPTS):
+            r = self.client.post(
+                "/api/v1/auth/reset-password",
+                json={"temp_token": temp_token, "code": wrong, "new_password": "BrandNewPass1"},
+            )
+            self.assertEqual(r.status_code, 400)
+        r = self.client.post(
+            "/api/v1/auth/reset-password",
+            json={"temp_token": temp_token, "code": real_code, "new_password": "BrandNewPass1"},
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertNotIn(temp_token, auth_module.PENDING_PASSWORD_RESET)
+
+    def test_reset_codes_per_user_are_rate_limited(self):
+        # Re-requesting tokens must not give an unlimited guess budget.
+        from media_manager.web.api import auth as auth_module
+        auth_module.CODE_ISSUE_LOG.clear()
+        asyncio.run(self._create_user())
+        tokens = []
+        for _ in range(auth_module.MAX_CODES_PER_WINDOW + 1):
+            r = self.client.post("/api/v1/auth/forgot-password", json={"username": self.USERNAME})
+            self.assertEqual(r.status_code, 200)
+            tokens.append(r.json()["temp_token"])
+        real = [t for t in tokens if auth_module.PENDING_PASSWORD_RESET.get(t, {}).get("user_id")]
+        self.assertEqual(len(real), auth_module.MAX_CODES_PER_WINDOW)
+        auth_module.CODE_ISSUE_LOG.clear()
+
+    def test_2fa_codes_per_user_are_rate_limited(self):
+        from media_manager.web.api import auth as auth_module
+        auth_module.CODE_ISSUE_LOG.clear()
+        asyncio.run(self._create_user(two_factor_enabled=True, two_factor_method="phone"))
+        for _ in range(auth_module.MAX_CODES_PER_WINDOW):
+            r = self.client.post("/api/v1/auth/login", json={"username": self.USERNAME, "password": self.password})
+            self.assertEqual(r.status_code, 200)
+        r = self.client.post("/api/v1/auth/login", json={"username": self.USERNAME, "password": self.password})
+        self.assertEqual(r.status_code, 429)
+        auth_module.CODE_ISSUE_LOG.clear()
+
+    def test_reset_password_code_expires(self):
+        from media_manager.web.api import auth as auth_module
+        asyncio.run(self._create_user())
+        temp_token, real_code = self._forgot()
+        auth_module.PENDING_PASSWORD_RESET[temp_token]["expires_at"] = 0
+        r = self.client.post(
+            "/api/v1/auth/reset-password",
+            json={"temp_token": temp_token, "code": real_code, "new_password": "BrandNewPass1"},
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertNotIn(temp_token, auth_module.PENDING_PASSWORD_RESET)
+
+    def test_2fa_locks_token_after_max_attempts(self):
+        from media_manager.web.api import auth as auth_module
+        asyncio.run(self._create_user(two_factor_enabled=True, two_factor_method="phone"))
+        login = self.client.post(
+            "/api/v1/auth/login", json={"username": self.USERNAME, "password": self.password}
+        )
+        temp_token = login.json()["temp_token"]
+        real_code = auth_module.PENDING_2FA[temp_token]["code"]
+        wrong = "000000" if real_code != "000000" else "111111"
+        for _ in range(auth_module.MAX_CODE_ATTEMPTS):
+            r = self.client.post("/api/v1/auth/verify-2fa", json={"temp_token": temp_token, "code": wrong})
+            self.assertEqual(r.status_code, 400)
+        r = self.client.post("/api/v1/auth/verify-2fa", json={"temp_token": temp_token, "code": real_code})
+        self.assertEqual(r.status_code, 400)
+
+    def test_2fa_code_expires(self):
+        from media_manager.web.api import auth as auth_module
+        asyncio.run(self._create_user(two_factor_enabled=True, two_factor_method="phone"))
+        login = self.client.post(
+            "/api/v1/auth/login", json={"username": self.USERNAME, "password": self.password}
+        )
+        temp_token = login.json()["temp_token"]
+        real_code = auth_module.PENDING_2FA[temp_token]["code"]
+        auth_module.PENDING_2FA[temp_token]["expires_at"] = 0
+        r = self.client.post("/api/v1/auth/verify-2fa", json={"temp_token": temp_token, "code": real_code})
+        self.assertEqual(r.status_code, 400)
 
     def test_bypass_reset_password_endpoint_gone(self):
         asyncio.run(self._create_user())

@@ -22,7 +22,7 @@ window.loadAdminUsers = async function() {
         window.loadedUsers = data.users;
         renderAdminUsers(data.users, container);
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">${escapeHtml(err.message)}</p>`;
     }
 };
 
@@ -62,12 +62,12 @@ function renderAdminUsers(users, container) {
                     ${users.map(u => {
                         const fullName = [u.first_name || '', u.last_name || ''].join(' ').trim() || 'N/A';
                         const contact = [
-                            u.email ? `✉️ ${u.email}` : '',
-                            u.phone ? `📱 ${u.phone}` : ''
+                            u.email ? `✉️ ${escapeHtml(u.email)}` : '',
+                            u.phone ? `📱 ${escapeHtml(u.phone)}` : ''
                         ].filter(Boolean).join('<br>') || 'N/A';
 
                         const tfaBadge = u.two_factor_enabled
-                            ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;">🔒 ${u.two_factor_method.toUpperCase()}</span>`
+                            ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;">🔒 ${escapeHtml(String(u.two_factor_method).toUpperCase())}</span>`
                             : `<span class="badge text-muted" style="border: 1px solid var(--border-color);">None</span>`;
 
                         return `
@@ -75,7 +75,7 @@ function renderAdminUsers(users, container) {
                                 <td style="padding: 0.75rem 0.5rem;"><b>${escapeHtml(u.username)}</b></td>
                                 <td style="padding: 0.75rem 0.5rem; color: var(--text-secondary);">${escapeHtml(fullName)}</td>
                                 <td style="padding: 0.75rem 0.5rem; font-size: 0.8rem; line-height: 1.3;">${contact}</td>
-                                <td style="padding: 0.75rem 0.5rem;"><span class="badge ${u.role === 'admin' ? 'badge-4k' : 'badge-sd'}">${u.role}</span></td>
+                                <td style="padding: 0.75rem 0.5rem;"><span class="badge ${u.role === 'admin' ? 'badge-4k' : 'badge-sd'}">${escapeHtml(u.role)}</span></td>
                                 <td style="padding: 0.75rem 0.5rem;">${tfaBadge}</td>
                                 <td style="padding: 0.75rem 0.5rem; font-size: 0.78rem; color: var(--text-secondary);">
                                     ${formatLastLogin(u)}
@@ -85,11 +85,11 @@ function renderAdminUsers(users, container) {
                                     ${isCallerAdmin ? (
                                         u.role === 'admin' ?
                                             `<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed; min-width: 140px; justify-content: center;" title="Admin accounts cannot be demoted">Protected</button>` :
-                                            `<button class="btn btn-secondary btn-sm" onclick="toggleUserRole('${u.id}', 'admin')" style="min-width: 140px; justify-content: center;">Make Admin</button>`
+                                            `<button class="btn btn-secondary btn-sm" data-id="${escapeHtml(u.id)}" onclick="toggleUserRole(this.dataset.id, 'admin')" style="min-width: 140px; justify-content: center;">Make Admin</button>`
                                     ) : ''}
-                                    ${isCallerAdmin ? `<button class="btn btn-secondary btn-sm" onclick="adminResetPassword('${u.id}', '${u.username}')" style="min-width: 140px; justify-content: center;">🔑 Reset Password</button>` : ''}
-                                    <button class="btn btn-secondary btn-sm" onclick="editUser('${u.id}')" style="min-width: 140px; justify-content: center;">✏️ Edit</button>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}', '${u.username}')" style="min-width: 140px; justify-content: center;">🗑️ Delete</button>
+                                    ${isCallerAdmin ? `<button class="btn btn-secondary btn-sm" data-id="${escapeHtml(u.id)}" data-username="${escapeHtml(u.username)}" onclick="adminResetPassword(this.dataset.id, this.dataset.username)" style="min-width: 140px; justify-content: center;">🔑 Reset Password</button>` : ''}
+                                    <button class="btn btn-secondary btn-sm" data-id="${escapeHtml(u.id)}" onclick="editUser(this.dataset.id)" style="min-width: 140px; justify-content: center;">✏️ Edit</button>
+                                    <button class="btn btn-danger btn-sm" data-id="${escapeHtml(u.id)}" data-username="${escapeHtml(u.username)}" onclick="deleteUser(this.dataset.id, this.dataset.username)" style="min-width: 140px; justify-content: center;">🗑️ Delete</button>
                                 </td>
                             </tr>
                         `;
@@ -102,19 +102,19 @@ function renderAdminUsers(users, container) {
             ${users.map(u => {
                 const fullName = [u.first_name || '', u.last_name || ''].join(' ').trim() || 'N/A';
                 const contact = [
-                    u.email ? `✉️ ${u.email}` : '',
-                    u.phone ? `📱 ${u.phone}` : ''
+                    u.email ? `✉️ ${escapeHtml(u.email)}` : '',
+                    u.phone ? `📱 ${escapeHtml(u.phone)}` : ''
                 ].filter(Boolean).join(' • ') || 'N/A';
 
                 const tfaBadge = u.two_factor_enabled
-                    ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;">🔒 ${u.two_factor_method.toUpperCase()}</span>`
+                    ? `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid #10b981;">🔒 ${escapeHtml(String(u.two_factor_method).toUpperCase())}</span>`
                     : `<span class="badge text-muted" style="border: 1px solid var(--border-color);">None</span>`;
 
                 return `
                     <div class="admin-user-card">
                         <div class="admin-user-card-header">
                             <span style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">👤 ${escapeHtml(u.username)}</span>
-                            <span class="badge ${u.role === 'admin' ? 'badge-4k' : 'badge-sd'}">${u.role}</span>
+                            <span class="badge ${u.role === 'admin' ? 'badge-4k' : 'badge-sd'}">${escapeHtml(u.role)}</span>
                         </div>
                         <div class="admin-user-card-body">
                             <div><b>Name:</b> ${escapeHtml(fullName)}</div>
@@ -127,11 +127,11 @@ function renderAdminUsers(users, container) {
                             ${isCallerAdmin ? (
                                 u.role === 'admin' ?
                                     `<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed; font-size: 0.78rem; min-width: 120px; justify-content: center;">Protected</button>` :
-                                    `<button class="btn btn-secondary btn-sm" onclick="toggleUserRole('${u.id}', 'admin')" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">Make Admin</button>`
+                                    `<button class="btn btn-secondary btn-sm" data-id="${escapeHtml(u.id)}" onclick="toggleUserRole(this.dataset.id, 'admin')" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">Make Admin</button>`
                             ) : ''}
-                            ${isCallerAdmin ? `<button class="btn btn-secondary btn-sm" onclick="adminResetPassword('${u.id}', '${u.username}')" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">🔑 Reset Password</button>` : ''}
-                            <button class="btn btn-secondary btn-sm" onclick="editUser('${u.id}')" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">✏️ Edit</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}', '${u.username}')" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">🗑️ Delete</button>
+                            ${isCallerAdmin ? `<button class="btn btn-secondary btn-sm" data-id="${escapeHtml(u.id)}" data-username="${escapeHtml(u.username)}" onclick="adminResetPassword(this.dataset.id, this.dataset.username)" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">🔑 Reset Password</button>` : ''}
+                            <button class="btn btn-secondary btn-sm" data-id="${escapeHtml(u.id)}" onclick="editUser(this.dataset.id)" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">✏️ Edit</button>
+                            <button class="btn btn-danger btn-sm" data-id="${escapeHtml(u.id)}" data-username="${escapeHtml(u.username)}" onclick="deleteUser(this.dataset.id, this.dataset.username)" style="font-size: 0.78rem; min-width: 120px; justify-content: center;">🗑️ Delete</button>
                         </div>
                     </div>
                 `;
@@ -168,7 +168,7 @@ async function adminResetPassword(userId, username) {
             
             <form id="admin-reset-pwd-form">
                 <div style="margin-bottom: 1.25rem;">
-                    <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">New Password for <b>${username}</b></label>
+                    <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">New Password for <b>${escapeHtml(username)}</b></label>
                     <div style="position: relative; display: flex; align-items: center;">
                         <input type="password" id="arp-password" required class="search-input" placeholder="••••••••" style="width: 100%; padding: 8px 12px; padding-right: 2.5rem; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary);">
                         <button type="button" onclick="window.togglePasswordVisibility('arp-password', this)" style="position: absolute; right: 8px; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; font-size: 1rem; line-height: 1; display: flex; align-items: center; outline: none;">👁️</button>
@@ -357,22 +357,22 @@ window.editUser = function(userId) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div>
                         <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">First Name *</label>
-                        <input type="text" id="eu-firstname" required value="${u.first_name || ''}" class="form-control" placeholder="e.g. John" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
+                        <input type="text" id="eu-firstname" required value="${escapeHtml(u.first_name || '')}" class="form-control" placeholder="e.g. John" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
                     </div>
                     <div>
                         <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Last Name *</label>
-                        <input type="text" id="eu-lastname" required value="${u.last_name || ''}" class="form-control" placeholder="e.g. Doe" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
+                        <input type="text" id="eu-lastname" required value="${escapeHtml(u.last_name || '')}" class="form-control" placeholder="e.g. Doe" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div>
                         <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Email</label>
-                        <input type="email" id="eu-email" value="${u.email || ''}" class="form-control" placeholder="jdoe@example.com" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
+                        <input type="email" id="eu-email" value="${escapeHtml(u.email || '')}" class="form-control" placeholder="jdoe@example.com" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
                     </div>
                     <div>
                         <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">Phone Number</label>
-                        <input type="tel" id="eu-phone" value="${u.phone || ''}" class="form-control" placeholder="+15550199" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
+                        <input type="tel" id="eu-phone" value="${escapeHtml(u.phone || '')}" class="form-control" placeholder="+15550199" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
                     </div>
                 </div>
 
@@ -446,13 +446,13 @@ window.deleteUser = function(userId, username) {
         <div class="section-card" style="width: 100%; max-width: 450px; padding: 2rem; border: 1px solid var(--border-color); text-align: left; box-shadow: none;">
             <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1.3rem; display: flex; align-items: center; gap: 8px; color: #ef4444;">⚠️ Delete User Account</h3>
             <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
-                Are you absolutely sure you want to delete the account <b>${username}</b>?
+                Are you absolutely sure you want to delete the account <b>${escapeHtml(username)}</b>?
                 This action is permanent and cannot be undone. All settings and credentials for this user will be removed.
             </p>
             
             <div style="margin-bottom: 1.25rem;">
                 <label style="font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 6px;">
-                    Please type <b>${username}</b> or the user's ID below to confirm:
+                    Please type <b>${escapeHtml(username)}</b> or the user's ID below to confirm:
                 </label>
                 <input type="text" id="du-confirm-input" class="search-input" placeholder="Type username or ID" style="width: 100%; padding: 8px 12px; font-size: 0.88rem; border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
             </div>

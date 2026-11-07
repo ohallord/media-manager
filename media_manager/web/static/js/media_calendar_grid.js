@@ -100,11 +100,11 @@ function renderMediaCalendarGridInternal() {
 
         const chips = dayItems.slice(0, 3).map(it => {
             const clickable = !!it.tmdb_id;
-            const onclick = clickable ? `window.showMediaDetailModal({tmdb_id: ${it.tmdb_id}, type: '${it.type || 'movie'}'})` : '';
+            const onclick = clickable ? `window.showMediaDetailModal({tmdb_id: ${it.tmdb_id}, type: '${it.type === 'tv' ? 'tv' : 'movie'}'})` : '';
             return `
                 <div class="upcal-item${clickable ? '' : ' upcal-item-static'}" style="border-left-color: ${mediaCalendarBorderColor(it.status)};" ${onclick ? `onclick="${onclick}"` : ''}>
-                    ${it.poster_url ? `<img src="${it.poster_url}" loading="lazy" decoding="async" alt="" onerror="this.style.display='none'">` : ''}
-                    <span title="${(it.title || '').replace(/"/g, '&quot;')}">${it.title}</span>
+                    ${it.poster_url ? `<img src="${escapeHtml(it.poster_url)}" loading="lazy" decoding="async" alt="" onerror="this.style.display='none'">` : ''}
+                    <span title="${escapeHtml(it.title || '')}">${escapeHtml(it.title)}</span>
                 </div>
             `;
         }).join('');

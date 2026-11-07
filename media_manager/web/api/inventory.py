@@ -506,11 +506,11 @@ async def delete_worse_duplicates(
 @router.post("/scan")
 async def trigger_inventory_scan(
     background_tasks: BackgroundTasks,
-    user: get_current_active_user = Depends(get_current_active_user)
+    user=Depends(get_admin_user),
 ):
     """
     Triggers an asynchronous media directory scan in the background.
-    Requires authentication.
+    Admin only: a full scan walks every media directory.
     """
     clear_duplicates_cache()
     background_tasks.add_task(scan_all)

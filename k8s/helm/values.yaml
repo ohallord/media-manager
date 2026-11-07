@@ -18,19 +18,21 @@ env:
   # SQLite file at DB_PATH (default: SQLite on the config volume).
   USE_POSTGRES: "false"
   DB_PATH: "/config/media.db"
-  # Must match the token the host watcher sends (media_manager/heartbeat.py default).
-  WATCHER_HEARTBEAT_TOKEN: "media-manager-watcher"
 
 # Rendered into the chart Secret. Empty values are skipped. Set them at
 # install time, e.g.:
 #   --set-string secrets.JWT_SECRET="$(openssl rand -hex 32)"
 #   --set-string secrets.INITIAL_ADMIN_PASSWORD="$(openssl rand -base64 18)"
+#   --set-string secrets.WATCHER_HEARTBEAT_TOKEN="$(openssl rand -hex 32)"
 # INITIAL_ADMIN_PASSWORD has no default: without it no admin account is
 # created. POSTGRES_URI is only read if env.USE_POSTGRES is "true".
 secrets:
   JWT_SECRET: ""
   INITIAL_ADMIN_PASSWORD: ""
   POSTGRES_URI: ""
+  # Shared with the host watcher (its WATCHER_HEARTBEAT_TOKEN). No default:
+  # unset, the watcher's HTTP heartbeat is rejected and the UI shows it stale.
+  WATCHER_HEARTBEAT_TOKEN: ""
 
 # Config/database volume - always mounted at /config for the SQLite DB
 # (see env.DB_PATH above) and other persistent app state.

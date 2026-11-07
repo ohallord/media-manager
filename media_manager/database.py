@@ -129,6 +129,7 @@ _MEDIA_ITEMS_COLUMNS = [
 
 # Same idea for other tables that gained columns: (table, column, type).
 _EXTRA_COLUMNS = [
+    ("users", "token_version", "INTEGER NOT NULL DEFAULT 0"),
     ("service_heartbeats", "version", "VARCHAR(32)"),
     ("service_heartbeats", "detail_json", "TEXT"),
     ("transcode_control", "pause_on", "VARCHAR(16) NOT NULL DEFAULT 'transcode_only'"),

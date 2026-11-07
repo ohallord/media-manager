@@ -22,7 +22,7 @@ async function fetchAndRenderCalendar(container) {
         window._lastCalendarEvents = events || [];
         renderCalendarShell(container);
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">Failed to load calendar: ${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">Failed to load calendar: ${escapeHtml(err.message)}</p>`;
     }
 }
 

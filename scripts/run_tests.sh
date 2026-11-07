@@ -12,6 +12,8 @@ cd "$(dirname "$0")/.."
 TMP_DB="$(mktemp -u "${TMPDIR:-/tmp}/media_manager_test_XXXXXX.db")"
 export DB_PATH="$TMP_DB"
 export WATCHER_HEARTBEAT_HTTP=0
+# Ephemeral signing key so config never persists a .jwt_secret next to the temp DB.
+export JWT_SECRET="$(python3 -c 'import secrets; print(secrets.token_hex(32))' 2>/dev/null || openssl rand -hex 32)"
 trap 'rm -f "$TMP_DB"' EXIT
 
 echo "Running tests against isolated DB: $DB_PATH" >&2

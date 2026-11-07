@@ -505,6 +505,22 @@ class TestDownloadQueue(BaseIntegrationsTest):
         self.assertTrue(resp.json()["success"])
         MockRadarr.return_value.delete_queue_item.assert_awaited_once_with(9)
 
+    def test_queue_action_forbidden_for_non_admin(self):
+        # Security review 2026-11-07 MEDIUM 5: any user could delete active downloads.
+        from types import SimpleNamespace
+        regular = SimpleNamespace(username="u", role="user", must_change_password=False)
+        app.dependency_overrides.pop(get_admin_user, None)
+        app.dependency_overrides[get_current_active_user] = lambda: regular
+        app.dependency_overrides[get_async_db] = _routing_db({"radarr": _config("radarr")})
+        with patch.object(integrations_module, "RadarrClient") as MockRadarr:
+            MockRadarr.return_value.delete_queue_item = AsyncMock(return_value=True)
+            resp = self.client.post(
+                "/api/v1/integrations/download-queue/action",
+                json={"action": "remove", "type": "movie", "id": 9},
+            )
+        self.assertEqual(resp.status_code, 403)
+        MockRadarr.return_value.delete_queue_item.assert_not_called()
+
     def test_queue_action_search_requires_ids(self):
         configs = {"radarr": _config("radarr")}
         app.dependency_overrides[get_async_db] = _routing_db(configs)

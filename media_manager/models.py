@@ -28,6 +28,9 @@ class User(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     last_login_at = Column(DateTime, nullable=True)
     must_change_password = Column(Boolean, nullable=False, default=False)
+    # Bumped on every password change; JWTs carry it as "tv" and older values
+    # are rejected, so a password change logs out every other session.
+    token_version = Column(Integer, nullable=False, default=0)
 
     passkeys = relationship("PasskeyCredential", back_populates="user", cascade="all, delete-orphan")
 

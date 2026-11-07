@@ -591,7 +591,8 @@
             document.title = label + ' · Media Manager';
 
             const rescanBtn = document.getElementById('rescan-btn');
-            if (rescanBtn) rescanBtn.style.display = (viewId === 'inventory') ? '' : 'none';
+            const isAdminUser = !!(window.currentUser && window.currentUser.role === 'admin');
+            if (rescanBtn) rescanBtn.style.display = (viewId === 'inventory' && isAdminUser) ? '' : 'none';
 
             // Load view content
             if (viewId === 'inventory') {

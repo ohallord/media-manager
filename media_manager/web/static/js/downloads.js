@@ -48,7 +48,7 @@ window.loadDownloads = async function() {
             window.downloadsPollTimeout = setTimeout(window.checkQueueForActivity, 20000);
         }
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">Failed to load downloads status: ${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">Failed to load downloads status: ${escapeHtml(err.message)}</p>`;
     }
 };
 
@@ -141,10 +141,10 @@ function renderHistoryList() {
                 return `
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 0.65rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.8rem;">
                         <div style="flex: 1; min-width: 0; padding-right: 0.75rem;">
-                            <div style="font-weight: 500; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; word-break: break-all;" title="${s.name}">${s.name}</div>
+                            <div style="font-weight: 500; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; word-break: break-all;" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</div>
                             <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
                                 ${sourceBadge}
-                                <span title="${fullTimeStr}">${timeStr}</span> | <span>Category: ${s.category || 'Default'}</span>
+                                <span title="${fullTimeStr}">${timeStr}</span> | <span>Category: ${escapeHtml(s.category || 'Default')}</span>
                             </div>
                         </div>
                         <div style="text-align: right; white-space: nowrap;">
@@ -202,7 +202,7 @@ function renderDashboard(queueData, historyData, syncthingData, syncthingHistory
                     <div style="margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-secondary);">Size remaining: <b>${queueData.size_remaining || '0 MB'}</b></div>
                     ${queue.map(item => `
                         <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); margin-bottom: 0.5rem;">
-                            <div style="font-weight: 600; font-size: 0.85rem; word-break: break-all;">${item.filename}</div>
+                            <div style="font-weight: 600; font-size: 0.85rem; word-break: break-all;">${escapeHtml(item.filename)}</div>
                             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
                                 <span>Progress: <b>${item.percentage}%</b> (${item.size})</span>
                                 <span>Timeleft: <b>${item.timeleft}</b></span>
@@ -220,6 +220,8 @@ function renderDashboard(queueData, historyData, syncthingData, syncthingHistory
         `;
     }
 
+    // Queue actions (remove/retry/search) are admin-only server-side.
+    const isQueueAdmin = !!(window.currentUser && window.currentUser.role === 'admin');
     // Radarr / Sonarr Download Queue (grabbed releases downloading/importing -
     // distinct from the raw SABnzbd NZB queue above, tracks per-movie/episode
     // status and import progress rather than the download job itself)
@@ -238,20 +240,20 @@ function renderDashboard(queueData, historyData, syncthingData, syncthingHistory
                 <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md); margin-bottom: 0.5rem;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 6px;">
                         <span style="font-weight: 600; font-size: 0.85rem; word-break: break-all;">${item.type === 'movie' ? '🎬' : '📺'} ${escapeHtml(item.title)}</span>
-                        <span style="font-size: 0.65rem; color: #fff; background: ${item.error_message ? 'var(--danger)' : 'var(--accent-color)'}; padding: 1px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase; white-space: nowrap;">${item.status || 'unknown'}</span>
+                        <span style="font-size: 0.65rem; color: #fff; background: ${item.error_message ? 'var(--danger)' : 'var(--accent-color)'}; padding: 1px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase; white-space: nowrap;">${escapeHtml(item.status || 'unknown')}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; flex-wrap: wrap; gap: 4px;">
-                        <span>Progress: <b>${item.progress_pct}%</b>${item.quality ? ` &nbsp;·&nbsp; ${item.quality}` : ''}</span>
+                        <span>Progress: <b>${item.progress_pct}%</b>${item.quality ? ` &nbsp;·&nbsp; ${escapeHtml(item.quality)}` : ''}</span>
                         <span>${item.timeleft ? `Timeleft: <b>${item.timeleft}</b>` : ''}</span>
                     </div>
                     ${item.error_message ? `<div style="font-size: 0.72rem; color: var(--danger); margin-top: 0.4rem;">${escapeHtml(item.error_message)}</div>` : ''}
-                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 0.45rem;">
-                        <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="window.arrQueueAction('remove', '${item.type}', ${item.id}, ${item.movie_id || 'null'}, ${item.series_id || 'null'}, ${item.episode_id || 'null'})">Remove</button>
+                    ${isQueueAdmin ? `<div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 0.45rem;">
+                        <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="window.arrQueueAction('remove', '${item.type === 'tv' ? 'tv' : 'movie'}', ${Number(item.id)}, ${Number(item.movie_id) || 'null'}, ${Number(item.series_id) || 'null'}, ${Number(item.episode_id) || 'null'})">Remove</button>
                         ${(item.error_message || (item.tracked_status && String(item.tracked_status).toLowerCase() === 'warning')) ? `
-                        <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="window.arrQueueAction('retry', '${item.type}', ${item.id}, ${item.movie_id || 'null'}, ${item.series_id || 'null'}, ${item.episode_id || 'null'})">Retry</button>
+                        <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="window.arrQueueAction('retry', '${item.type === 'tv' ? 'tv' : 'movie'}', ${Number(item.id)}, ${Number(item.movie_id) || 'null'}, ${Number(item.series_id) || 'null'}, ${Number(item.episode_id) || 'null'})">Retry</button>
                         ` : ''}
-                        <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="window.arrQueueAction('search', '${item.type}', ${item.id}, ${item.movie_id || 'null'}, ${item.series_id || 'null'}, ${item.episode_id || 'null'})">Search now</button>
-                    </div>
+                        <button class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 2px 8px;" onclick="window.arrQueueAction('search', '${item.type === 'tv' ? 'tv' : 'movie'}', ${Number(item.id)}, ${Number(item.movie_id) || 'null'}, ${Number(item.series_id) || 'null'}, ${Number(item.episode_id) || 'null'})">Search now</button>
+                    </div>` : ''}
                 </div>
             `).join('')}
         </div>
@@ -277,8 +279,8 @@ function renderDashboard(queueData, historyData, syncthingData, syncthingHistory
                         return `
                             <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: var(--radius-md);">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-                                    <span style="font-weight: 600; font-size: 0.85rem; word-break: break-all;" title="${f.path}">${f.label}</span>
-                                    <span style="font-size: 0.65rem; color: #fff; background: ${badgeColor}; padding: 1px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase;">${f.state}</span>
+                                    <span style="font-weight: 600; font-size: 0.85rem; word-break: break-all;" title="${escapeHtml(f.path)}">${escapeHtml(f.label)}</span>
+                                    <span style="font-size: 0.65rem; color: #fff; background: ${badgeColor}; padding: 1px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase;">${escapeHtml(f.state)}</span>
                                 </div>
                                 <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
                                     <span>Sync Progress: <b>${f.completion}%</b></span>
@@ -292,8 +294,8 @@ function renderDashboard(queueData, historyData, syncthingData, syncthingHistory
                                         <span style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 600;">Files in progress:</span>
                                         <div style="display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.25rem;">
                                             ${f.needed_files.slice(0, 3).map(file => `
-                                                <div style="font-size: 0.7rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: var(--text-primary);" title="${file.name}">
-                                                    • ${file.name}
+                                                <div style="font-size: 0.7rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: var(--text-primary);" title="${escapeHtml(file.name)}">
+                                                    • ${escapeHtml(file.name)}
                                                 </div>
                                             `).join('')}
                                             ${f.needed_files.length > 3 ? `

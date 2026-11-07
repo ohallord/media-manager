@@ -32,13 +32,13 @@ async function loadMediaDetail(tmdb_id, type) {
         const data = await res.json();
 
         if (!res.ok) {
-            body.innerHTML = `<p class="error-msg">${data.detail || 'Failed to load details.'}</p>`;
+            body.innerHTML = `<p class="error-msg">${escapeHtml(data.detail || 'Failed to load details.')}</p>`;
             return;
         }
 
         renderMediaDetailBody(data);
     } catch (err) {
-        body.innerHTML = `<p class="error-msg">Failed to load details: ${err.message}</p>`;
+        body.innerHTML = `<p class="error-msg">Failed to load details: ${escapeHtml(err.message)}</p>`;
     }
 }
 

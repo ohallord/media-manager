@@ -16,7 +16,7 @@ POSTGRES_URI = os.getenv("POSTGRES_URI", "postgresql+asyncpg://mediauser:mediapa
 SYNC_POSTGRES_URI = os.getenv("SYNC_POSTGRES_URI", POSTGRES_URI.replace("+asyncpg", "+psycopg2") if "+asyncpg" in POSTGRES_URI else POSTGRES_URI)
 
 # Security & WebAuthn / Passkey Secrets
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-key-change-in-production")
+# JWT_SECRET is resolved below, after DB_PATH (see _resolve_jwt_secret).
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "720"))
 RP_ID = os.getenv("RP_ID", "localhost")
@@ -61,6 +61,45 @@ AUDIO_EXTENSIONS = [".mp3", ".ogg", ".flac", ".wav"]
 
 # Fallback DB Path for SQLite backward compatibility
 DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "media.db"))
+
+# The old hardcoded fallback is public, so it is treated exactly like "unset".
+_LEGACY_JWT_SECRET = "dev-secret-key-change-in-production"
+
+
+def _resolve_jwt_secret(env_value, secret_file):
+    """
+    Fail-safe JWT signing key. An explicit JWT_SECRET wins. Otherwise use a random
+    key persisted (mode 0600) at secret_file so sessions survive restarts; if that
+    file cannot be written, use an ephemeral random key (everyone is logged out on
+    restart, but tokens can never be forged with a known key).
+    """
+    import secrets as _secrets
+    if env_value and env_value != _LEGACY_JWT_SECRET:
+        return env_value
+    if secret_file:
+        try:
+            with open(secret_file, encoding="utf-8") as f:
+                existing = f.read().strip()
+            if len(existing) >= 32:
+                return existing
+        except OSError:
+            pass
+        generated = _secrets.token_urlsafe(48)
+        try:
+            fd = os.open(secret_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(generated)
+            os.chmod(secret_file, 0o600)
+            return generated
+        except OSError:
+            pass
+    return _secrets.token_urlsafe(48)
+
+
+JWT_SECRET_FILE = os.getenv("JWT_SECRET_FILE") or (
+    os.path.join(os.path.dirname(os.path.abspath(DB_PATH)), ".jwt_secret") if DB_PATH != ":memory:" else None
+)
+JWT_SECRET = _resolve_jwt_secret(os.getenv("JWT_SECRET"), JWT_SECRET_FILE)
 
 # Ownership & Permissions
 UID = int(os.getenv("UID", "1000"))

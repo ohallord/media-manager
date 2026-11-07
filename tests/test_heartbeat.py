@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
@@ -7,6 +9,8 @@ from media_manager.database import SyncSessionLocal
 from media_manager.heartbeat import tick_watcher_heartbeat, WATCHER_SERVICE, STALE_AFTER_SECONDS
 from media_manager.models import ServiceHeartbeat
 from media_manager.web.app import app
+
+TEST_TOKEN = "test-watcher-token"
 
 
 class TestWatcherHeartbeat(unittest.TestCase):
@@ -63,16 +67,44 @@ class TestWatcherHeartbeat(unittest.TestCase):
         self.assertTrue(resp.json()["stale"])
 
     def test_http_ingest_without_token_is_401(self):
-        resp = self.client.post("/api/v1/watcher/heartbeat", json={"pid": 1})
+        with patch.dict(os.environ, {"WATCHER_HEARTBEAT_TOKEN": TEST_TOKEN}):
+            resp = self.client.post("/api/v1/watcher/heartbeat", json={"pid": 1})
         self.assertEqual(resp.status_code, 401)
 
+    def test_http_ingest_rejected_when_server_token_unset(self):
+        # Regression: the server used to fall back to a public default token,
+        # so anyone could spoof watcher liveness.
+        env = {k: v for k, v in os.environ.items() if k != "WATCHER_HEARTBEAT_TOKEN"}
+        with patch.dict(os.environ, env, clear=True):
+            resp = self.client.post(
+                "/api/v1/watcher/heartbeat", json={"pid": 1},
+                headers={"X-Watcher-Token": "media-manager-watcher"},
+            )
+        self.assertEqual(resp.status_code, 503)
+
+    def test_http_ingest_wrong_token_is_401(self):
+        with patch.dict(os.environ, {"WATCHER_HEARTBEAT_TOKEN": TEST_TOKEN}):
+            resp = self.client.post(
+                "/api/v1/watcher/heartbeat", json={"pid": 1},
+                headers={"X-Watcher-Token": "media-manager-watcher"},
+            )
+        self.assertEqual(resp.status_code, 401)
+
+    def test_tick_http_skips_without_token(self):
+        from media_manager.heartbeat import tick_http
+        env = {k: v for k, v in os.environ.items() if k != "WATCHER_HEARTBEAT_TOKEN"}
+        env["WATCHER_HEARTBEAT_HTTP"] = "1"
+        with patch.dict(os.environ, env, clear=True), patch("urllib.request.urlopen") as urlopen:
+            tick_http()
+        urlopen.assert_not_called()
+
     def test_http_ingest_with_token_marks_alive(self):
-        from media_manager.heartbeat import DEFAULT_TOKEN
-        resp = self.client.post(
-            "/api/v1/watcher/heartbeat",
-            json={"pid": 42, "hostname": "testhost"},
-            headers={"X-Watcher-Token": DEFAULT_TOKEN},
-        )
+        with patch.dict(os.environ, {"WATCHER_HEARTBEAT_TOKEN": TEST_TOKEN}):
+            resp = self.client.post(
+                "/api/v1/watcher/heartbeat",
+                json={"pid": 42, "hostname": "testhost"},
+                headers={"X-Watcher-Token": TEST_TOKEN},
+            )
         self.assertEqual(resp.status_code, 200)
         status = self.client.get("/api/v1/integrations/watcher-status")
         self.assertTrue(status.json()["alive"])
@@ -93,7 +125,8 @@ class TestWatcherHeartbeat(unittest.TestCase):
                 raise OSError("refused")
             return None
 
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen), \
+                patch.dict(os.environ, {"WATCHER_HEARTBEAT_TOKEN": TEST_TOKEN}):
             tick_http()
         self.assertEqual(calls, ["http://127.0.0.1:1/bad", "http://127.0.0.1:2/ok"])
         os.environ["WATCHER_HEARTBEAT_HTTP"] = "0"

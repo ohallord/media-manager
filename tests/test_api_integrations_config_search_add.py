@@ -1,6 +1,6 @@
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from media_manager.web.app import app
 from media_manager.database import get_async_db
@@ -665,3 +665,32 @@ class TestSearchTrigger(_BaseIntegrationsTest):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestResolveAddDefaultsRootFolder(unittest.TestCase):
+    """Regression: /add accepted any root_folder_path, even from non-admins."""
+
+    def _client(self, folders):
+        client = MagicMock()
+        client.get_profiles = AsyncMock(return_value=[{"id": 7}])
+        client.get_root_folders = AsyncMock(return_value=folders)
+        return client
+
+    def test_rejects_unknown_root_folder(self):
+        from fastapi import HTTPException
+        from media_manager.web.api.integrations import _resolve_add_defaults
+        client = self._client([{"path": "/media/Movies/"}])
+        with self.assertRaises(HTTPException) as ctx:
+            asyncio.run(_resolve_add_defaults(client, "radarr", None, "/etc"))
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_accepts_known_root_folder_ignoring_trailing_slash(self):
+        from media_manager.web.api.integrations import _resolve_add_defaults
+        client = self._client([{"path": "/media/Movies/"}])
+        profile, folder = asyncio.run(_resolve_add_defaults(client, "radarr", None, "/media/Movies"))
+        self.assertEqual((profile, folder), (7, "/media/Movies"))
+
+    def test_defaults_to_first_root_folder(self):
+        from media_manager.web.api.integrations import _resolve_add_defaults
+        client = self._client([{"path": "/tv"}, {"path": "/tv2"}])
+        self.assertEqual(asyncio.run(_resolve_add_defaults(client, "sonarr", 3, None)), (3, "/tv"))

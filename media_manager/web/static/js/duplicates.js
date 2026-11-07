@@ -14,7 +14,7 @@ window.loadDuplicates = async function(forceRefresh = false) {
         window._lastDuplicatesData = data;
         renderDuplicatesView(data, container);
     } catch (err) {
-        container.innerHTML = `<div class="error-msg">Error loading duplicates: ${err.message}</div>`;
+        container.innerHTML = `<div class="error-msg">Error loading duplicates: ${escapeHtml(err.message)}</div>`;
     }
 };
 
@@ -96,15 +96,15 @@ function renderDuplicatesView(data, container) {
                         <div style="background: rgba(16, 185, 129, 0.08); padding: 1rem; border: 1px solid rgba(16, 185, 129, 0.3); margin-bottom: 1rem;">
                             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.35rem;">
                                 <span style="font-weight: 700; color: #10b981; font-size: 0.92rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                    ⭐ RECOMMENDED TO KEEP (${best.resolution} • Score: ${best.quality_score} pts)
+                                    ⭐ RECOMMENDED TO KEEP (${escapeHtml(best.resolution)} • Score: ${escapeHtml(best.quality_score)} pts)
                                 </span>
                                 <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">${bestSizeGb} GB</span>
                             </div>
                             <div style="font-size: 0.82rem; color: var(--text-secondary);">
                                 <b>Codec:</b> ${best.video_codec ? best.video_codec.toUpperCase() : 'N/A'} / ${best.audio_codec ? best.audio_codec.toUpperCase() : 'N/A'}
                             </div>
-                            <div style="font-size: 0.78rem; word-break: break-all; margin-top: 0.35rem; color: var(--text-secondary); opacity: 0.8;" title="${best.path}">
-                                <b>Path:</b> ${best.path}
+                            <div style="font-size: 0.78rem; word-break: break-all; margin-top: 0.35rem; color: var(--text-secondary); opacity: 0.8;" title="${escapeHtml(best.path)}">
+                                <b>Path:</b> ${escapeHtml(best.path)}
                             </div>
                         </div>
                     ` : ''}
@@ -120,15 +120,15 @@ function renderDuplicatesView(data, container) {
                                 <div style="background: rgba(239, 68, 68, 0.06); padding: 0.85rem; border: 1px solid rgba(239, 68, 68, 0.2); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                                     <div style="flex: 1; min-width: 200px;">
                                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 4px;">
-                                            <span class="badge badge-sd" style="background: rgba(239,68,68,0.2); color: #f87171;">${c.resolution}</span>
+                                            <span class="badge badge-sd" style="background: rgba(239,68,68,0.2); color: #f87171;">${escapeHtml(c.resolution)}</span>
                                             <span style="font-weight: 600; font-size: 0.88rem;">Score: ${c.quality_score} pts</span>
                                             <span style="font-size: 0.82rem; color: var(--text-secondary);">${cSizeGb} GB</span>
                                         </div>
-                                        <div style="font-size: 0.78rem; color: var(--text-secondary); word-break: break-all;" title="${c.path}">
-                                            <b>Path:</b> ${c.path}
+                                        <div style="font-size: 0.78rem; color: var(--text-secondary); word-break: break-all;" title="${escapeHtml(c.path)}">
+                                            <b>Path:</b> ${escapeHtml(c.path)}
                                         </div>
                                     </div>
-                                    <button class="btn btn-danger" style="font-size: 0.78rem; padding: 6px 12px; white-space: nowrap;" onclick="deleteSingleDuplicateItem('${c.id}', '${c.path.replace(/'/g, "\\'")}')">
+                                    <button class="btn btn-danger" style="font-size: 0.78rem; padding: 6px 12px; white-space: nowrap;" data-id="${escapeHtml(c.id)}" data-path="${escapeHtml(c.path)}" onclick="deleteSingleDuplicateItem(this.dataset.id, this.dataset.path)">
                                         🗑️ Delete File
                                     </button>
                                 </div>
@@ -156,7 +156,7 @@ window.showConfirmDeleteModal = function({ title, message, path, onConfirm }) {
             
             ${path ? `
                 <div style="border: 1px solid var(--border-color); padding: 0.75rem; font-family: monospace; font-size: 0.78rem; text-align: left; word-break: break-all; margin-bottom: 1.5rem; color: var(--text-primary);">
-                    ${path}
+                    ${escapeHtml(path)}
                 </div>
             ` : ''}
 

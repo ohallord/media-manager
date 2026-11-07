@@ -62,6 +62,9 @@ function updateUserUI() {
     const isAdmin = !!(window.currentUser && window.currentUser.role === 'admin');
     document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? 'flex' : 'none'; });
     const view = currentViewId();
+    // Library rescans are admin-only (POST /inventory/scan).
+    const rescanBtn = document.getElementById('rescan-btn');
+    if (rescanBtn) rescanBtn.style.display = (isAdmin && view === 'inventory') ? '' : 'none';
     if (window.ADMIN_ONLY_VIEWS.includes(view)) {
         if (!isAdmin) {
             location.hash = '#inventory';
@@ -214,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 console.log('Login Response:', data);
                 if (data.status === 'requires_2fa') {
-                    const code = prompt(`Two-factor verification is required. A code was sent via ${data.two_factor_method.toUpperCase()}.`);
+                    const code = prompt(`Two-factor verification is required. A code was sent via ${String(data.two_factor_method || '').toUpperCase()}.`);
                     if (!code || !code.trim()) {
                         throw new Error('Verification code is required');
                     }
@@ -318,19 +321,19 @@ function openForgotPasswordModal() {
             }
 
             const data = await res.json();
-            transitionToVerifyReset(modal, username, data.temp_token, data.method);
+            transitionToVerifyReset(modal, username, data.temp_token);
         } catch (err) {
             showToast(`Error: ${err.message}`);
         }
     };
 }
 
-function transitionToVerifyReset(modal, username, tempToken, method) {
+function transitionToVerifyReset(modal, username, tempToken) {
     const card = modal.querySelector('.section-card');
     card.innerHTML = `
         <h3 style="margin-top: 0; margin-bottom: 1.25rem; font-size: 1.3rem; display: flex; align-items: center; gap: 8px;">🔑 Reset User Password</h3>
         <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
-            A verification code was sent to your registered <b>${method.toUpperCase()}</b>. Please enter the code and your new password below.
+            If this account has an email or phone number on file, a verification code was sent to it. Enter the code and your new password below. The code expires in 10 minutes. No code? Ask an administrator to reset your password.
         </p>
         
         <form id="forgot-verify-form">

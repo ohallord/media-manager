@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 WATCHER_SERVICE = "watcher"
 STALE_AFTER_SECONDS = 90
-DEFAULT_TOKEN = "media-manager-watcher"
 DEFAULT_HEARTBEAT_URL = "http://127.0.0.1:18088/api/v1/watcher/heartbeat"
 
 
 def watcher_token() -> str:
-    return os.getenv("WATCHER_HEARTBEAT_TOKEN") or DEFAULT_TOKEN
+    """Shared secret for the HTTP heartbeat. No default: unset disables it."""
+    return (os.getenv("WATCHER_HEARTBEAT_TOKEN") or "").strip()
 
 
 def _ensure_table() -> None:
@@ -56,6 +56,10 @@ def tick_http() -> None:
     flag = os.getenv("WATCHER_HEARTBEAT_HTTP", "1").strip().lower()
     if flag in ("0", "false", "no", "off"):
         return
+    token = watcher_token()
+    if not token:
+        logger.warning("WATCHER_HEARTBEAT_TOKEN is not set; skipping HTTP heartbeat")
+        return
     raw = os.getenv("WATCHER_HEARTBEAT_URL") or DEFAULT_HEARTBEAT_URL
     urls = [u.strip() for u in raw.split(",") if u.strip()]
     body = json.dumps({"pid": os.getpid()}).encode("utf-8")
@@ -72,7 +76,7 @@ def tick_http() -> None:
             method="POST",
             headers={
                 "Content-Type": "application/json",
-                "X-Watcher-Token": watcher_token(),
+                "X-Watcher-Token": token,
             },
         )
         try:

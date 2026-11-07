@@ -130,6 +130,41 @@ class TestApiAdminUsers(unittest.TestCase):
                 self.assertEqual(u.role, "user") # Not escalated!
         self.loop.run_until_complete(verify())
 
+    def _self_edit(self, **overrides):
+        app.dependency_overrides[get_current_active_user] = lambda: self.regular_user
+        payload = {
+            "first_name": "Regular", "last_name": "Test",
+            "email": "regular@test.com", "phone": "22222", "two_factor_method": "none",
+        }
+        payload.update(overrides)
+        return self.client.put(f"/api/v1/admin/users/{self.regular_user.id}", json=payload)
+
+    def test_self_edit_rejects_html_in_email(self):
+        # Security review 2026-11-07 HIGH 2: stored XSS via own profile email.
+        r = self._self_edit(email="<img src=x onerror=alert(1)>@x.com")
+        self.assertEqual(r.status_code, 400)
+
+    def test_self_edit_rejects_html_in_phone(self):
+        r = self._self_edit(phone='"><svg onload=alert(1)>')
+        self.assertEqual(r.status_code, 400)
+
+    def test_self_edit_rejects_unknown_two_factor_method(self):
+        # two_factor_method is rendered in the admin table; only known values allowed.
+        r = self._self_edit(two_factor_method="<b>x</b>")
+        self.assertEqual(r.status_code, 400)
+
+    def test_self_edit_accepts_normal_contact(self):
+        r = self._self_edit(email="first.last+tag@example.co.uk", phone="+1 (555) 010-0199")
+        self.assertEqual(r.status_code, 200)
+
+    def test_create_user_rejects_html_in_email(self):
+        app.dependency_overrides[get_current_active_user] = lambda: self.admin_user
+        r = self.client.post("/api/v1/admin/users", json={
+            "username": "xss_probe_user", "password": "pw123456", "first_name": "A", "last_name": "B",
+            "email": "<script>@x.com",
+        })
+        self.assertEqual(r.status_code, 400)
+
     def test_edit_user_forbidden(self):
         # Regular user cannot edit admin user's details
         app.dependency_overrides[get_current_active_user] = lambda: self.regular_user
