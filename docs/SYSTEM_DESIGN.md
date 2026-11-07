@@ -145,6 +145,10 @@ a one-time credential. Tests: `tests/test_initial_admin_fail_closed.py`.
 Email notification dispatch runs asynchronously inside the web portal using an asyncio-supported executor threadpool:
 1. **Login 2FA Code**: If a user attempts password login with 2FA enabled via email, a 6-digit verification code is generated, saved in memory, and relayed to the user's email address using the configured SMTP server.
 2. **Password Recovery Code**: Enables self-service password resets from the login card.
+
+Both one-time codes (`web/api/auth.py`) come from `secrets.randbelow`, are compared with `hmac.compare_digest`, expire after `CODE_TTL_SECONDS` (10 min), and the `temp_token` is dropped after `MAX_CODE_ATTEMPTS` (5) wrong guesses; at most `MAX_CODES_PER_WINDOW` (5) codes are issued per user per 10 min (2FA login returns 429, forgot-password quietly returns a decoy), so a 6-digit code cannot be brute-forced. `POST /auth/forgot-password` returns the same `{status, temp_token}` for unknown users and users with no email/phone (a decoy token that never verifies), so it is not a username oracle. Pending codes are per-process memory, so a restart cancels them.
+
+Sessions: each JWT carries the user's `token_version` as `tv`. Every password change (self-service, reset, or admin reset) bumps `users.token_version`, so all older tokens stop working; the browser that changed its own password gets a fresh cookie. Disabled users (`is_active = false`) cannot log in and their tokens are ignored. The cookie is `HttpOnly`, `SameSite=Lax`, and `Secure` when the request arrived over HTTPS (`COOKIE_SECURE`, default `auto`). Logs (`/api/v1/logs/*`) and `POST /inventory/scan` are admin only. `/add` only accepts a `root_folder_path` that Radarr/Sonarr already lists.
 3. **H.265 migration mail**: daily summaries, failure-streak alerts, and worker-silent alerts from `web/services/transcode_notify.py` (§16.7).
 4. **Download-stack health alerts**: `web/services/integration_health.run_health_checks` runs on every 60 s `transcode_scheduler` sweep. For each enabled Radarr/Sonarr/SABnzbd config it calls the client's `get_status()`; for Radarr/Sonarr it also reads `/api/v3/health` and treats a `DownloadClientCheck` or `DownloadClientStatusCheck` entry as "can't reach its download client". The result is stored in `IntegrationConfig.status` (`HEALTHY`, `UNREACHABLE`, `DOWNLOAD_CLIENT_ERROR`; the Admin > Integrations badge) and an email goes out only when it changes: one when a problem starts (after 2 failing checks in a row, so a single timeout is ignored) and one on recovery. Because the state is in the DB, a pod restart does not re-send. Recipients are the H.265 notify list (`TranscodeControl.notify_emails`, all active admins if blank). SMS is not sent: `User.phone` stores no carrier, so there is no free email-to-SMS address to use.
 
@@ -326,6 +330,8 @@ flowchart TD
   `/api/v1/watcher/heartbeat` into the Kubernetes-hosted database (checkout SQLite is a
   different file than `/config/media.db`). Default URL is the host NodePort
   `http://127.0.0.1:18088/...` because `media.local` does not resolve here.
+  `WATCHER_HEARTBEAT_TOKEN` has no default: the endpoint returns 503 until it is
+  set on the web app, and the watcher skips the HTTP beat until it is set there.
 - "More Like This" merges `/recommendations` and `/similar` (recommendations
   first), capped at 12 titles, each clickable to drill into its own detail
   view - browsing related titles is a chain of modals, not a separate page.

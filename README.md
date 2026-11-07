@@ -1,4 +1,8 @@
-<p align="center"><img src="media_manager/web/static/img/logo.svg" width="96" height="96" alt="Media Manager logo: three spines on a shelf, one with a play symbol"></p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/header-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/brand/header-light.png">
+  <img src="docs/brand/header-light.png" alt="Media Manager — Concept C" width="960">
+</picture>
 
 # Media Manager
 
@@ -123,6 +127,9 @@ python3 main.py serve
 On first login the app asks you to change the generated password. There is no
 default password: if `INITIAL_ADMIN_PASSWORD` is unset, no admin account is
 created.
+There is no default `JWT_SECRET` either: if it is unset, the app generates a
+random one and stores it next to the database. Changing a password signs out
+every other session.
 
 To run it with Docker instead:
 

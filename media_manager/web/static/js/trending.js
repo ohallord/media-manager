@@ -37,13 +37,13 @@ async function loadTrendingList() {
         const data = await parseApiJson(res);
 
         if (!res.ok) {
-            container.innerHTML = `<div class="section-card" style="text-align: center;"><p class="error-msg">${data.detail || 'Failed to load trending titles.'}</p></div>`;
+            container.innerHTML = `<div class="section-card" style="text-align: center;"><p class="error-msg">${escapeHtml(data.detail || 'Failed to load trending titles.')}</p></div>`;
             return;
         }
 
         renderTrending(data);
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">Failed to load trending titles: ${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">Failed to load trending titles: ${escapeHtml(err.message)}</p>`;
     }
 }
 

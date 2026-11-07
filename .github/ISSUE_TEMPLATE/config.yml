@@ -1,0 +1,4 @@
+blank_issues_enabled: false
+# Private vulnerability reporting is not confirmed for this repository.
+# Do not add an advisories contact link until that setting is verified.
+# Use SECURITY.md instead of a public issue.

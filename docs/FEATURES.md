@@ -26,7 +26,7 @@ Streams live structured log events via Server-Sent Events (SSE) and records comp
 
 ## Authentication, roles, and recovery
 
-Password and WebAuthn / Passkey authentication, 2FA, forced password reset after an admin-initiated change, and self-service **Forgot Password** recovery (via email/SMS verification code).
+Password and WebAuthn / Passkey authentication, 2FA, forced password reset after an admin-initiated change, and self-service **Forgot Password** recovery (via email/SMS verification code). Verification codes expire after 10 minutes and lock after 5 wrong guesses. Changing a password signs out every other session; disabled accounts cannot sign in.
 
 ## Radarr, Sonarr, and SABnzbd integrations
 

@@ -87,7 +87,10 @@ rest runs on defaults: SQLite database, no external integrations configured.
 | `USE_POSTGRES` | `false` | Set `true` to use Postgres instead of SQLite |
 | `POSTGRES_URI` | `postgresql+asyncpg://mediauser:mediapass@localhost:5432/mediadb` | Async SQLAlchemy URI, only read if `USE_POSTGRES=true` |
 | `SYNC_POSTGRES_URI` | derived from `POSTGRES_URI` | Sync driver URI (for CLI commands); auto-derived, rarely needs setting directly |
-| `JWT_SECRET` | `dev-secret-key-change-in-production` | **Change this in any real deployment** - signs session tokens |
+| `JWT_SECRET` | random, persisted to `JWT_SECRET_FILE` | Signs session tokens. Set it explicitly for multi-replica or Helm deploys. If unset (or set to the old public default `dev-secret-key-change-in-production`), a random key is generated and saved with mode 0600; if that file can't be written, an in-memory key is used and every restart logs everyone out |
+| `JWT_SECRET_FILE` | `.jwt_secret` next to `DB_PATH` | Where the generated `JWT_SECRET` is kept |
+| `COOKIE_SECURE` | `auto` | `auto` marks the session cookie `Secure` when the request came over HTTPS (or `X-Forwarded-Proto: https` from the ingress); `true` / `false` force it |
+| `WATCHER_HEARTBEAT_TOKEN` | none | Shared secret for the host watcher's HTTP heartbeat. Set the same value on the web app and the watcher; unset, the web app rejects heartbeats (503) and the watcher skips them |
 | `JWT_EXPIRATION_HOURS` | `720` | Session token lifetime |
 | `RP_ID` | `localhost` | WebAuthn/passkey relying party ID - set to your actual domain if using passkeys |
 | `RP_NAME` | `Media Manager Portal` | WebAuthn/passkey display name |
@@ -134,7 +137,10 @@ This detects the current user/directory and creates
 `media-manager-watcher.service`, enabled and started. The unit POSTs a
 heartbeat to `http://127.0.0.1:18088/api/v1/watcher/heartbeat` (a NodePort
 to the portal running in Kubernetes) so Admin/Logs can show liveness. Override with
-`WATCHER_HEARTBEAT_URL` if the portal is elsewhere. Manage it with the
+`WATCHER_HEARTBEAT_URL` if the portal is elsewhere. The heartbeat token lives in
+`/etc/media-manager/watcher.env` (mode 0600): the script reuses an existing file,
+otherwise takes `WATCHER_HEARTBEAT_TOKEN` from your shell or generates one. Give the
+web app the same value (Helm: `secrets.WATCHER_HEARTBEAT_TOKEN`). Manage it with the
 usual `sudo systemctl {start,stop,status} media-manager-watcher` /
 `sudo journalctl -u media-manager-watcher -f`. Remove it with `./uninstall.sh`.
 

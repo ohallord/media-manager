@@ -21,7 +21,7 @@ async function loadUpcomingTvList(days) {
         const data = await res.json();
 
         if (!res.ok) {
-            container.innerHTML = `<div class="section-card" style="text-align: center;"><p class="error-msg">${data.detail || 'Failed to load upcoming TV shows.'}</p></div>`;
+            container.innerHTML = `<div class="section-card" style="text-align: center;"><p class="error-msg">${escapeHtml(data.detail || 'Failed to load upcoming TV shows.')}</p></div>`;
             return;
         }
 
@@ -33,7 +33,7 @@ async function loadUpcomingTvList(days) {
             renderUpcomingTv(data);
         }
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">Failed to load upcoming TV shows: ${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">Failed to load upcoming TV shows: ${escapeHtml(err.message)}</p>`;
     }
 }
 

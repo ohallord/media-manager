@@ -23,6 +23,11 @@ ADMIN_ONLY_ENDPOINTS = [
     ("GET", "/api/v1/transcode/status"),
     ("GET", "/api/v1/transcode/jobs"),
     ("GET", "/api/v1/transcode/jobs/some-id"),
+    # Security review 2026-11-07: logs and full library scans are admin-only.
+    ("GET", "/api/v1/logs/recent"),
+    ("GET", "/api/v1/logs/history"),
+    ("GET", "/api/v1/logs/moves"),
+    ("POST", "/api/v1/inventory/scan"),
 ]
 
 

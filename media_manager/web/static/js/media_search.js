@@ -67,7 +67,7 @@ async function performUnifiedSearch() {
 
         renderSearchResults(data, container);
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">Search error: ${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">Search error: ${escapeHtml(err.message)}</p>`;
     }
 }
 

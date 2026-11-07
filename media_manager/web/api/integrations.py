@@ -529,11 +529,16 @@ async def _resolve_add_defaults(client, service_name: str, quality_profile_id: O
             raise HTTPException(status_code=400, detail=f"No quality profiles configured in {service_name.capitalize()}. Please set one up there first.")
         quality_profile_id = profiles[0].get("id")
 
+    folders = await client.get_root_folders()
+    if not folders:
+        raise HTTPException(status_code=400, detail=f"No root folder configured in {service_name.capitalize()}. Please set one up there first.")
     if not root_folder_path:
-        folders = await client.get_root_folders()
-        if not folders:
-            raise HTTPException(status_code=400, detail=f"No root folder configured in {service_name.capitalize()}. Please set one up there first.")
         root_folder_path = folders[0].get("path")
+    else:
+        # Only accept a root folder the *arr already has; never an arbitrary path.
+        allowed = {str(f.get("path") or "").rstrip("/") for f in folders}
+        if root_folder_path.rstrip("/") not in allowed:
+            raise HTTPException(status_code=400, detail=f"Unknown {service_name.capitalize()} root folder.")
 
     return quality_profile_id, root_folder_path
 
@@ -2503,9 +2508,10 @@ class QueueActionRequest(BaseModel):
 async def act_on_download_queue(
     req: QueueActionRequest,
     db: AsyncSession = Depends(get_async_db),
-    user: User = Depends(get_current_active_user)
+    user: User = Depends(get_admin_user)
 ):
-    """Retry, remove, or search-now for a Radarr/Sonarr queue row (stuck grabs)."""
+    """Retry, remove, or search-now for a Radarr/Sonarr queue row (stuck grabs). Admin only:
+    remove deletes the download from the client."""
     service = "radarr" if req.type == "movie" else "sonarr"
     result = await db.execute(select(IntegrationConfig).where(IntegrationConfig.service_name == service))
     config = result.scalar_one_or_none()

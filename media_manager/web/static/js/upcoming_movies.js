@@ -106,7 +106,7 @@ async function loadUpcomingMoviesList() {
         const data = await res.json();
 
         if (!res.ok) {
-            container.innerHTML = `<div class="section-card" style="text-align: center;"><p class="error-msg">${data.detail || 'Failed to load upcoming movies.'}</p></div>`;
+            container.innerHTML = `<div class="section-card" style="text-align: center;"><p class="error-msg">${escapeHtml(data.detail || 'Failed to load upcoming movies.')}</p></div>`;
             return;
         }
 
@@ -118,7 +118,7 @@ async function loadUpcomingMoviesList() {
             renderUpcomingMovies(data);
         }
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">Failed to load upcoming movies: ${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">Failed to load upcoming movies: ${escapeHtml(err.message)}</p>`;
     }
 }
 

@@ -21,7 +21,7 @@ window.loadAdminIntegrations = async function() {
         renderAdminIntegrations(data.configs, container);
         if (typeof window.refreshWatcherHeartbeat === 'function') window.refreshWatcherHeartbeat();
     } catch (err) {
-        container.innerHTML = `<p class="error-msg">${err.message}</p>`;
+        container.innerHTML = `<p class="error-msg">${escapeHtml(err.message)}</p>`;
     }
 };
 
@@ -255,7 +255,7 @@ window.loadAdminDirectories = async function() {
 
         renderDirectoriesList(data, listContainer);
     } catch (err) {
-        listContainer.innerHTML = `<p class="error-msg">${err.message}</p>`;
+        listContainer.innerHTML = `<p class="error-msg">${escapeHtml(err.message)}</p>`;
     }
 };
 
@@ -277,7 +277,7 @@ function renderDirectoriesList(directories, container) {
                 let pillFg = 'var(--text-secondary)';
 
                 if (ds.error) {
-                    pillHtml = `<span style="font-size: 0.75rem; color: #ef4444; font-weight: 500;">⚠️ ${ds.error}</span>`;
+                    pillHtml = `<span style="font-size: 0.75rem; color: #ef4444; font-weight: 500;">⚠️ ${escapeHtml(ds.error)}</span>`;
                 } else if (ds.total) {
                     const freePct = ds.free_percent;
                     const usedPct = (100 - freePct).toFixed(1);
@@ -318,7 +318,7 @@ function renderDirectoriesList(directories, container) {
                     <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 0.8rem 1.2rem; border-radius: var(--radius-md); gap: 1.5rem; flex-wrap: wrap;">
                         <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 200px;">
                             <span style="font-size: 1.1rem;">📁</span>
-                            <span style="font-family: monospace; font-size: 0.92rem; font-weight: 500; word-break: break-all; color: var(--text-primary);">${d.path}</span>
+                            <span style="font-family: monospace; font-size: 0.92rem; font-weight: 500; word-break: break-all; color: var(--text-primary);">${escapeHtml(d.path)}</span>
                         </div>
                         ${progressHtml}
                         <div style="display: flex; align-items: center; gap: 0.8rem; justify-content: flex-end; min-width: 180px;">

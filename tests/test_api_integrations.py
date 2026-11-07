@@ -188,7 +188,9 @@ class TestApiIntegrationsAdd(unittest.TestCase):
     def test_add_movie_respects_explicit_overrides(self, mock_radarr_cls):
         client_instance = mock_radarr_cls.return_value
         client_instance.get_profiles = AsyncMock(return_value=[{"id": 7, "name": "HD-1080p"}])
-        client_instance.get_root_folders = AsyncMock(return_value=[{"id": 1, "path": "/media/Movies/"}])
+        client_instance.get_root_folders = AsyncMock(return_value=[
+            {"id": 1, "path": "/media/Movies/"}, {"id": 2, "path": "/mnt/OtherMovies/"},
+        ])
         client_instance.add_movie = AsyncMock(return_value={"success": True, "data": {}})
 
         app.dependency_overrides[get_async_db] = _override_db_with_config(_fake_config("radarr"))
@@ -204,7 +206,8 @@ class TestApiIntegrationsAdd(unittest.TestCase):
 
         self.assertEqual(res.status_code, 200)
         client_instance.get_profiles.assert_not_awaited()
-        client_instance.get_root_folders.assert_not_awaited()
+        # The explicit root folder is still checked against the ones Radarr has.
+        client_instance.get_root_folders.assert_awaited_once()
         _, kwargs = client_instance.add_movie.call_args
         self.assertEqual(kwargs["root_folder_path"], "/mnt/OtherMovies/")
         self.assertEqual(kwargs["quality_profile_id"], 99)

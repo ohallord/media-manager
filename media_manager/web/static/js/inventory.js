@@ -47,7 +47,7 @@ window.loadInventory = async function(offset = 0) {
             renderPagination(data.total, limit, offset);
         }
     } catch (err) {
-        container.innerHTML = `<div class="error-msg">Error loading inventory: ${err.message}</div>`;
+        container.innerHTML = `<div class="error-msg">Error loading inventory: ${escapeHtml(err.message)}</div>`;
     }
 };
 
@@ -88,7 +88,7 @@ function renderInventoryGrid(items, container) {
                     <div style="font-size: 0.75rem; overflow-wrap: break-word; word-break: break-word;" title="${escapeHtml(item.path)}"><b>Path:</b> ${escapeHtml(item.path)}</div>
                 </div>
                 <div style="margin-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.5rem; text-align: right;">
-                    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; color: #f87171; border-color: rgba(239,68,68,0.25);" onclick="deleteSingleDuplicateItem('${item.id}', '${escapeHtml(item.path.replace(/'/g, "\\'"))}')">
+                    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; color: #f87171; border-color: rgba(239,68,68,0.25);" data-id="${escapeHtml(item.id)}" data-path="${escapeHtml(item.path)}" onclick="deleteSingleDuplicateItem(this.dataset.id, this.dataset.path)">
                         🗑️ Delete File
                     </button>
                 </div>
@@ -114,7 +114,7 @@ function paintInventoryMeta(metaElem, meta) {
     if (!(meta.rating || (meta.genres && meta.genres.length > 0) || meta.overview || meta.trailer_url || meta.cast || meta.requested_by)) return;
     let badgeHtml = '';
     if (meta.rating) {
-        badgeHtml += `<span style="color: #f1c40f; font-weight: bold; font-size: 0.8rem; margin-right: 6px;">⭐ ${meta.rating}/10</span> `;
+        badgeHtml += `<span style="color: #f1c40f; font-weight: bold; font-size: 0.8rem; margin-right: 6px;">⭐ ${escapeHtml(meta.rating)}/10</span> `;
     }
     if (meta.trailer_url) {
         badgeHtml += `<a href="${escapeHtml(meta.trailer_url)}" target="_blank" rel="noopener noreferrer" class="trailer-link">▶ Trailer</a> `;
@@ -215,7 +215,7 @@ async function loadCardArtwork(itemId, title, mediaType, path) {
             if (meta.rating || (meta.genres && meta.genres.length > 0) || meta.overview || meta.trailer_url || meta.cast) {
                 let badgeHtml = '';
                 if (meta.rating) {
-                    badgeHtml += `<span style="color: #f1c40f; font-weight: bold; font-size: 0.8rem; margin-right: 6px;">⭐ ${meta.rating}/10</span> `;
+                    badgeHtml += `<span style="color: #f1c40f; font-weight: bold; font-size: 0.8rem; margin-right: 6px;">⭐ ${escapeHtml(meta.rating)}/10</span> `;
                 }
                 if (meta.trailer_url) {
                     badgeHtml += `<a href="${meta.trailer_url}" target="_blank" rel="noopener noreferrer" style="color: var(--text-secondary); font-weight: 600; text-decoration: none; border: 1px solid var(--border-color); border-radius: 999px; padding: 1px 8px; font-size: 0.7rem; margin-right: 6px;">▶ Trailer</a> `;
@@ -329,25 +329,25 @@ function renderTVShowsBySeason(items, container) {
                                     const badgeClass = ep.resolution === '4K' ? 'badge-4k' : (ep.resolution === '1080p' ? 'badge-1080p' : 'badge-sd');
                                     const sizeMb = formatGB(ep.size_bytes) + ' GB';
                                     const epCode = `S${sNum.toString().padStart(2, '0')}E${(ep.episode !== null ? ep.episode : 0).toString().padStart(2, '0')}`;
-                                    const safeShowTitle = showTitle.replace(/"/g, '&quot;');
+                                    const safeShowTitle = escapeHtml(showTitle);
                                     
                                     return `
                                         <div class="media-card" id="media-item-${ep.id}" style="margin: 0; padding: 1rem;">
                                             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.4rem; margin-bottom: 0.5rem;">
-                                                <span class="badge ${badgeClass}">${ep.resolution}</span>
+                                                <span class="badge ${badgeClass}">${escapeHtml(ep.resolution)}</span>
                                                 <span style="font-weight: 700; color: var(--accent-color); font-size: 0.85rem; background: var(--accent-light); padding: 2px 8px;">${epCode}</span>
                                             </div>
-                                            <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 0.35rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${ep.title}">${ep.title || 'Episode ' + ep.episode}</div>
+                                            <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 0.35rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(ep.title)}">${escapeHtml(ep.title || 'Episode ' + ep.episode)}</div>
                                             ${renderPlaybackBadge(ep.play_count, ep.last_played_at, ep.play_sources)}
                                             <div id="ep-meta-${ep.id}" data-ep-id="${ep.id}" data-show="${safeShowTitle}" data-season="${sNum}" data-episode="${ep.episode || 0}"></div>
 
                                             <div class="media-specs">
                                                 <div><b>Codec:</b> ${ep.video_codec ? ep.video_codec.toUpperCase() : 'N/A'} / ${ep.audio_codec ? ep.audio_codec.toUpperCase() : 'N/A'} (${ep.audio_channels || 0}ch)</div>
                                                 <div><b>Size:</b> ${sizeMb} | <b>Score:</b> ${ep.quality_score} pts</div>
-                                                <div style="font-size: 0.72rem; word-break: break-all; margin-top: 0.35rem; color: var(--text-secondary);" title="${ep.path}"><b>Path:</b> ${ep.path}</div>
+                                                <div style="font-size: 0.72rem; word-break: break-all; margin-top: 0.35rem; color: var(--text-secondary);" title="${escapeHtml(ep.path)}"><b>Path:</b> ${escapeHtml(ep.path)}</div>
                                             </div>
                                             <div style="margin-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 0.5rem; text-align: right;">
-                                                <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; color: #f87171; border-color: rgba(239,68,68,0.25);" onclick="deleteSingleDuplicateItem('${ep.id}', '${ep.path.replace(/'/g, "\\'")}')">
+                                                <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 4px 10px; color: #f87171; border-color: rgba(239,68,68,0.25);" data-id="${escapeHtml(ep.id)}" data-path="${escapeHtml(ep.path)}" onclick="deleteSingleDuplicateItem(this.dataset.id, this.dataset.path)">
                                                     🗑️ Delete File
                                                 </button>
                                             </div>
@@ -435,7 +435,7 @@ async function loadTVShowArtwork(showIdx, showTitle) {
             if (meta.rating || (meta.genres && meta.genres.length > 0) || meta.overview || meta.release_date || meta.status) {
                 let badgeHtml = '';
                 if (meta.rating) {
-                    badgeHtml += `<span style="color: #f1c40f; font-weight: bold; font-size: 0.85rem; margin-right: 8px;">⭐ ${meta.rating}/10</span> `;
+                    badgeHtml += `<span style="color: #f1c40f; font-weight: bold; font-size: 0.85rem; margin-right: 8px;">⭐ ${escapeHtml(meta.rating)}/10</span> `;
                 }
                 if (meta.release_date) {
                     const year = meta.release_date.split('-')[0];
@@ -533,7 +533,8 @@ document.addEventListener('DOMContentLoaded', () => {
             rescanBtn.disabled = true;
             rescanBtn.innerHTML = '<span>Scanning...</span>';
             try {
-                await fetch('/api/v1/inventory/scan', { method: 'POST' });
+                const res = await fetch('/api/v1/inventory/scan', { method: 'POST' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 showToast('Library scan initiated in background!');
             } catch (err) {
                 showToast('Failed to start scan.');
@@ -567,19 +568,19 @@ async function loadTVEpisodeMetadata(showTitle, season, episode, itemId) {
         }
 
         let badges = [];
-        if (meta.rating) badges.push(`<span style="color: #f1c40f; font-weight: bold;">⭐ ${meta.rating}/10</span>`);
-        if (meta.release_date) badges.push(`<span style="color: var(--text-secondary);">📅 ${meta.release_date}</span>`);
+        if (meta.rating) badges.push(`<span style="color: #f1c40f; font-weight: bold;">⭐ ${escapeHtml(meta.rating)}/10</span>`);
+        if (meta.release_date) badges.push(`<span style="color: var(--text-secondary);">📅 ${escapeHtml(meta.release_date)}</span>`);
 
         if (badges.length > 0) {
             content += `<div style="font-size: 0.78rem; margin-bottom: 0.35rem; display: flex; gap: 8px;">${badges.join(' | ')}</div>`;
         }
 
         if (meta.title && meta.title.toLowerCase() !== showTitle.toLowerCase()) {
-            content += `<div style="font-weight: 600; font-size: 0.88rem; color: var(--accent-color); margin-bottom: 0.25rem;">"${meta.title}"</div>`;
+            content += `<div style="font-weight: 600; font-size: 0.88rem; color: var(--accent-color); margin-bottom: 0.25rem;">"${escapeHtml(meta.title)}"</div>`;
         }
 
         if (meta.overview) {
-            content += `<div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3; max-height: 3.6rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; margin-bottom: 0.4rem;" title="${meta.overview}">${meta.overview}</div>`;
+            content += `<div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3; max-height: 3.6rem; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; margin-bottom: 0.4rem;" title="${escapeHtml(meta.overview)}">${escapeHtml(meta.overview)}</div>`;
         }
 
         if (content) {

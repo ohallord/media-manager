@@ -23,6 +23,8 @@ async def ingest_watcher_heartbeat(
     show liveness even when SQLite files are not shared.
     """
     expected = watcher_token()
+    if not expected:
+        raise HTTPException(status_code=503, detail="WATCHER_HEARTBEAT_TOKEN is not configured")
     got = x_watcher_token or ""
     try:
         token_ok = hmac.compare_digest(got, expected)

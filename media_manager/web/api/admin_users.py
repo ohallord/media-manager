@@ -1,3 +1,4 @@
+import re
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from media_manager.database import get_async_db
 from media_manager.models import User
-from media_manager.web.api.auth import get_admin_user, get_current_active_user
+from media_manager.web.api.auth import get_admin_user, get_current_active_user, revoke_sessions
 from media_manager.web.services.auth import hash_password
 
 router = APIRouter(prefix="/api/v1/admin/users", tags=["admin-users"])
@@ -20,6 +21,22 @@ class CreateUserRequest(BaseModel):
     phone: Optional[str] = None
     role: Optional[str] = "user"
     two_factor_method: Optional[str] = "none"  # "email", "phone", or "none"
+
+# Contact fields are rendered in the admin Users view; reject anything that is not
+# plausibly an address/number so markup can never be stored (the UI escapes too).
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")
+_PHONE_RE = re.compile(r"^\+?[0-9 ().-]{3,32}$")
+_TWO_FACTOR_METHODS = ("none", "email", "phone")
+
+
+def _validate_contact(email: Optional[str], phone: Optional[str], method: str) -> None:
+    if email and (len(email) > 254 or not _EMAIL_RE.match(email)):
+        raise HTTPException(status_code=400, detail="Email address is not valid.")
+    if phone and not _PHONE_RE.match(phone):
+        raise HTTPException(status_code=400, detail="Phone number may contain only digits, spaces, +, -, ., ( and ).")
+    if method not in _TWO_FACTOR_METHODS:
+        raise HTTPException(status_code=400, detail="two_factor_method must be none, email, or phone.")
+
 
 class UpdateUserRoleRequest(BaseModel):
     role: str
@@ -78,6 +95,7 @@ async def create_user(
         raise HTTPException(status_code=400, detail="Either email or phone number is required.")
 
     method = req.two_factor_method or "none"
+    _validate_contact(email_clean, phone_clean, method)
     if method == "email" and not email_clean:
         raise HTTPException(status_code=400, detail="Email is required to enable Email Two-Factor Authentication.")
     if method == "phone" and not phone_clean:
@@ -159,6 +177,7 @@ async def admin_reset_user_password(
 
     user.password_hash = hash_password(req.new_password.strip())
     user.must_change_password = True
+    revoke_sessions(user)
     await db.commit()
     return {"message": f"Password for user '{user.username}' reset successfully"}
 
@@ -190,6 +209,7 @@ async def update_user(
         raise HTTPException(status_code=400, detail="Either email or phone number is required.")
 
     method = req.two_factor_method or "none"
+    _validate_contact(email_clean, phone_clean, method)
     if method == "email" and not email_clean:
         raise HTTPException(status_code=400, detail="Email is required to enable Email Two-Factor Authentication.")
     if method == "phone" and not phone_clean:

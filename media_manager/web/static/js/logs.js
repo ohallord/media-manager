@@ -69,7 +69,7 @@ window.loadRecentLogs = async function(count = 75) {
         data.logs.forEach(log => appendLogLine(box, log));
         box.scrollTop = box.scrollHeight;
     } catch (err) {
-        box.innerHTML = `<div class="log-line" style="color: #ff6b6b;">Error loading log history: ${err.message}</div>`;
+        box.innerHTML = `<div class="log-line" style="color: #ff6b6b;">Error loading log history: ${escapeHtml(err.message)}</div>`;
     }
 };
 

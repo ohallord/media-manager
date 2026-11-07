@@ -82,12 +82,12 @@ def get_recent_log_file_lines(count: int = 75) -> List[Dict[str, Any]]:
 
     return parsed
 
-from media_manager.web.api.auth import get_current_active_user
+from media_manager.web.api.auth import get_admin_user
 
 @router.get("/recent")
 async def get_recent_logs(
     count: int = Query(75, ge=1, le=1000),
-    user: Any = Depends(get_current_active_user)
+    user: Any = Depends(get_admin_user)
 ):
     """
     Returns the last N log lines (default 75) directly from media_manager.log.
@@ -108,7 +108,7 @@ async def get_log_history(
     limit: int = Query(75, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_async_db),
-    user: Any = Depends(get_current_active_user)
+    user: Any = Depends(get_admin_user)
 ):
     """
     Returns historical log events from database or log file fallback.
@@ -153,7 +153,7 @@ async def get_move_audits(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_async_db),
-    user: Any = Depends(get_current_active_user)
+    user: Any = Depends(get_admin_user)
 ):
     """
     Returns automated file move audit records from file_move_logs.
@@ -184,7 +184,7 @@ async def get_move_audits(
 @router.get("/stream")
 async def stream_live_logs(
     backfill: int = Query(75, ge=0, le=500),
-    user: Any = Depends(get_current_active_user)
+    user: Any = Depends(get_admin_user)
 ):
     """
     Establishes a Server-Sent Events (SSE) stream for real-time log push.

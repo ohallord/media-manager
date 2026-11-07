@@ -17,7 +17,23 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 PYTHON_BIN=$(which python3)
 USER=$(whoami)
 
+ENV_FILE="/etc/media-manager/watcher.env"
+
 echo "Installing Media Manager Watcher as a systemd service..."
+
+# Heartbeat token shared with the web app (its WATCHER_HEARTBEAT_TOKEN).
+# Kept in a root-only env file, not the world-readable unit file. An existing
+# token is reused; otherwise pass one in or a random one is generated.
+if sudo test -f "${ENV_FILE}"; then
+    echo "Keeping existing ${ENV_FILE}"
+else
+    TOKEN="${WATCHER_HEARTBEAT_TOKEN:-$(openssl rand -hex 32)}"
+    sudo install -d -m 0755 "$(dirname "${ENV_FILE}")"
+    echo "WATCHER_HEARTBEAT_TOKEN=${TOKEN}" | sudo tee "${ENV_FILE}" > /dev/null
+    sudo chmod 0600 "${ENV_FILE}"
+    echo "Wrote ${ENV_FILE}. Give the web app the same WATCHER_HEARTBEAT_TOKEN"
+    echo "(Helm: secrets.WATCHER_HEARTBEAT_TOKEN) or the heartbeat is rejected."
+fi
 
 # Create the service file
 cat <<EOF | sudo tee ${SERVICE_FILE} > /dev/null
@@ -31,7 +47,7 @@ User=${USER}
 WorkingDirectory=${PROJECT_DIR}
 ExecStart=${PYTHON_BIN} main.py watch
 Environment=WATCHER_HEARTBEAT_URL=http://127.0.0.1:18088/api/v1/watcher/heartbeat
-Environment=WATCHER_HEARTBEAT_TOKEN=media-manager-watcher
+EnvironmentFile=${ENV_FILE}
 Environment=WATCHER_HEARTBEAT_TLS_VERIFY=false
 Restart=always
 RestartSec=10

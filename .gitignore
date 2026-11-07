@@ -61,3 +61,6 @@ tmp/runner/
 # Local secrets and scratch output (never commit)
 *_token.txt
 tmp/
+
+# Auto-generated JWT signing key (config._resolve_jwt_secret)
+.jwt_secret

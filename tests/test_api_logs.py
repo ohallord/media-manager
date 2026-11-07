@@ -13,8 +13,9 @@ from media_manager.web.api.logs import get_recent_log_file_lines
 
 class TestApiLogs(unittest.TestCase):
     def setUp(self):
-        from media_manager.web.api.auth import get_current_user
+        from media_manager.web.api.auth import get_current_user, get_admin_user
         app.dependency_overrides[get_current_user] = lambda: {"username": "admin", "role": "admin"}
+        app.dependency_overrides[get_admin_user] = lambda: {"username": "admin", "role": "admin"}
         self.client = TestClient(app)
 
     def tearDown(self):
