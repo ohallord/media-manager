@@ -1,4 +1,8 @@
-<p align="center"><img src="media_manager/web/static/img/logo.svg" width="96" height="96" alt="Media Manager logo: three spines on a shelf, one with a play symbol"></p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/header-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/brand/header-light.png">
+  <img src="docs/brand/header-light.png" alt="Media Manager — Concept C" width="960">
+</picture>
 
 # Media Manager
 
