@@ -48,9 +48,11 @@ async def lifespan(app: FastAPI):
     from media_manager.web.services.metadata_sync import weekly_metadata_sync_scheduler
     from media_manager.web.services.playback_sync import playback_sync_scheduler
     from media_manager.web.services.transcode_scheduler import transcode_scheduler
+    from media_manager.web.services.request_notify import request_notify_scheduler
     sync_task = asyncio.create_task(weekly_metadata_sync_scheduler())
     playback_sync_task = asyncio.create_task(playback_sync_scheduler())
     transcode_task = asyncio.create_task(transcode_scheduler())
+    request_notify_task = asyncio.create_task(request_notify_scheduler())
 
     yield
 
@@ -58,6 +60,7 @@ async def lifespan(app: FastAPI):
     sync_task.cancel()
     playback_sync_task.cancel()
     transcode_task.cancel()
+    request_notify_task.cancel()
     await integrations_module.SHARED_HTTP_CLIENT.aclose()
     logger.info("Shutting down Media Manager Web Portal backend.")
 

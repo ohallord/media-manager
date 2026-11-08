@@ -92,6 +92,16 @@ class TMDbClient(BaseHTTPClient):
         )
         return data if isinstance(data, dict) else None
 
+    async def get_collection(self, collection_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Gets a TMDb collection (e.g. "Star Wars Collection") with its `parts` list of movies.
+        """
+        data = await self._tmdb_get(
+            f"/collection/{collection_id}",
+            label=f"TMDb get_collection failed for ID {collection_id}",
+        )
+        return data if isinstance(data, dict) else None
+
     @staticmethod
     def extract_trailer_url(details: Optional[Dict[str, Any]]) -> Optional[str]:
         """

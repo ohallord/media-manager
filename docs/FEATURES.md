@@ -44,13 +44,15 @@ Live per-movie/episode grab-to-import progress on the Downloads dashboard, along
 
 Per-user view of everything you've requested and its live status (requested → downloading → available), computed against the local library and Radarr/Sonarr.
 
+**Ready emails**: every 15 minutes the web pod re-checks requests and emails the requester once when one becomes available. Only requests made after the first sweep are emailed (no back-catalogue blast). Users turn it off with "Email me when my requests are ready" on My Requests; accounts without an email address are skipped. Needs the Email integration enabled.
+
 ## Trending now
 
 TMDb-powered "popular right now" discovery for movies/TV, independent of release date - complements Coming Soon's release-date-driven view. Enrichment is time-boxed so a slow TMDb/DNS stall returns titles (or a clear timeout message) instead of a gateway HTML error.
 
 ## Title detail with similar and recommended titles
 
-Click any poster/title (Search, Coming Soon, Trending, Calendar) for a full detail view with a "More Like This" row for further discovery.
+Click any poster/title (Search, Coming Soon, Trending, Calendar) for a full detail view with a "More Like This" row for further discovery. Movies that belong to a TMDb collection also show the whole collection with how many you own (e.g. "you own 4 of 9").
 
 ## Disk space monitoring
 
