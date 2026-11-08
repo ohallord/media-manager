@@ -65,6 +65,37 @@ function mediaDetailPlaybackHtml(data) {
     return `<div style="margin-top: 0.4rem;">${renderPlaybackBadge(pb.play_count, pb.last_played_at, pb.play_sources)}</div>`;
 }
 
+// Horizontal strip of clickable posters (each opens its own detail modal).
+// `headingHtml` must already be escaped; item fields are escaped here.
+function mediaDetailPosterRow(headingHtml, items, type) {
+    const safeType = type === 'tv' ? 'tv' : 'movie';
+    return `
+        <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem;">${headingHtml}</h4>
+            <div style="display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 4px;">
+                ${items.map(r => `
+                    <div onclick="window.showMediaDetailModal({tmdb_id: ${Number(r.tmdb_id)}, type: '${safeType}'})" style="cursor: pointer; flex-shrink: 0; width: 90px;${r.is_current ? ' opacity: 0.6;' : ''}" title="${escapeHtml(r.title)}${r.year ? ` (${escapeHtml(r.year)})` : ''}">
+                        ${r.poster_url
+                            ? `<img src="${escapeHtml(r.poster_url)}" loading="lazy" decoding="async" style="width: 90px; height: 135px; object-fit: cover; border-radius: var(--radius-md); box-shadow: 0 2px 6px rgba(0,0,0,0.4);" onerror="this.style.display='none'">`
+                            : `<div style="width: 90px; height: 135px; border-radius: var(--radius-md); background: var(--bg-primary); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🎬</div>`}
+                        <div style="font-size: 0.7rem; margin-top: 4px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(r.title)}</div>
+                        ${r.is_current ? '<div style="font-size: 0.62rem; color: var(--text-secondary);">This title</div>' : ''}
+                        ${r.status !== 'not_added' ? `<div style="font-size: 0.62rem; color: var(--success);">✔ ${r.status === 'in_library' ? 'Owned' : 'Added'}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function mediaDetailCollectionHtml(data) {
+    const c = data.collection;
+    if (!c || !c.parts || !c.parts.length) return '';
+    const pending = c.added_count - c.owned_count;
+    const heading = `${escapeHtml(c.name)} <span style="font-weight: 400; font-size: 0.8rem; color: var(--text-secondary);">· you own ${c.owned_count} of ${c.total}${pending > 0 ? ` (${pending} requested)` : ''}</span>`;
+    return mediaDetailPosterRow(heading, c.parts, 'movie');
+}
+
 function renderMediaDetailBody(data) {
     const body = document.getElementById('media-detail-body');
     const genreBadges = (data.genres || []).map(g => `
@@ -102,20 +133,8 @@ function renderMediaDetailBody(data) {
             </div>
         </div>
         ${typeof renderCastRow === 'function' && data.cast && data.cast.length ? `<div style="margin-top: 1rem;">${renderCastRow(data.cast)}</div>` : ''}
-        ${data.related && data.related.length ? `
-            <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                <h4 style="margin: 0 0 0.75rem 0; font-size: 0.95rem;">More Like This</h4>
-                <div style="display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 4px;">
-                    ${data.related.map(r => `
-                        <div onclick="window.showMediaDetailModal({tmdb_id: ${r.tmdb_id}, type: '${data.type}'})" style="cursor: pointer; flex-shrink: 0; width: 90px;" title="${escapeHtml(r.title)}">
-                            <img src="${r.poster_url}" loading="lazy" decoding="async" style="width: 90px; height: 135px; object-fit: cover; border-radius: var(--radius-md); box-shadow: 0 2px 6px rgba(0,0,0,0.4);" onerror="this.style.display='none'">
-                            <div style="font-size: 0.7rem; margin-top: 4px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(r.title)}</div>
-                            ${r.status !== 'not_added' ? `<div style="font-size: 0.62rem; color: var(--success);">✔ ${r.status === 'in_library' ? 'Owned' : 'Added'}</div>` : ''}
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        ` : ''}
+        ${mediaDetailCollectionHtml(data)}
+        ${data.related && data.related.length ? mediaDetailPosterRow('More Like This', data.related, data.type) : ''}
     `;
 
     const addBtn = document.getElementById('media-detail-add-btn');

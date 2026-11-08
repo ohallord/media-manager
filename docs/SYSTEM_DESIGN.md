@@ -267,6 +267,20 @@ flowchart TD
 
 ---
 
+### 9a. "Request ready" emails
+
+- Status logic lives in `web/services/request_status.py`
+  (`load_requests` → `apply_statuses`), shared by `GET /my-requests` and the
+  `request_notify_scheduler` started in the web lifespan (every 15 min).
+- `web/services/request_notify.py` returns early when the `email` integration
+  is disabled. Its first sweep writes a `__baseline__` row in
+  `request_notifications`; only requests newer than that are considered.
+  Each (user, dedupe key) gets one row once handled: `emailed=True` after a
+  successful send, `emailed=False` for opted-out, email-less or unknown users.
+  A failed send writes nothing, so the next sweep retries.
+- Opt-out: `users.notify_on_available` (default true), shown via `GET /auth/me`
+  and set with `PUT /auth/me/notifications` from the My Requests checkbox.
+
 ## 10. Trending Cache Flow
 
 ```mermaid
@@ -310,8 +324,11 @@ flowchart TD
     API -->|recommendations + similar, in parallel via asyncio.gather| TMDB
     API -->|Dedupe by id, exclude self, cap at 12| Related[Related Titles]
     Related -->|Same local library + Radarr/Sonarr status check as Coming Soon/Trending| Status[Status per related title]
+    API -->|movie with belongs_to_collection: /collection/id, same gather| TMDB
+    API -->|Parts sorted by release date, same status check| Collection[Collection progress]
     Status --> Modal
-    Modal -->|Click a related title| Modal
+    Collection --> Modal
+    Modal -->|Click a related or collection title| Modal
 ```
 
 - No new detail *page* - this app has no per-title route, so one reusable
@@ -335,6 +352,14 @@ flowchart TD
 - "More Like This" merges `/recommendations` and `/similar` (recommendations
   first), capped at 12 titles, each clickable to drill into its own detail
   view - browsing related titles is a chain of modals, not a separate page.
+- **Collections** (movies only): when TMDb's movie details carry
+  `belongs_to_collection`, `/collection/{id}` is fetched in the same
+  `asyncio.gather` as recommendations/similar and returned as `collection`
+  (`total`, `owned_count` = in library, `added_count` = in library or Radarr,
+  `parts` sorted by release date, undated last). The modal shows it as a
+  "you own X of Y" poster row above More Like This. A failed lookup returns
+  `collection: null` and never fails the request. There is no bulk
+  "add missing" action; each part is added from its own detail modal.
 
 ---
 

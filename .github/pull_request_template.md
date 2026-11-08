@@ -8,4 +8,4 @@
 - [ ] Chart edits were linted with `helm lint k8s/helm --set-string secrets.JWT_SECRET=ci-only`
 - [ ] User-facing notes are in the docs and under `[Unreleased]` in `CHANGELOG.md`
 - [ ] The diff has no passwords, tokens, or `.env` values
-- [ ] This pull request is not a vulnerability report (`SECURITY.md`)
+- [ ] This pull request is not a vulnerability report (see the [security policy](https://github.com/ohallord/media-manager/security/policy))

@@ -4,7 +4,7 @@ about: Something in Media Manager is broken or behaves unexpectedly
 labels: bug
 ---
 
-<!-- Security issue? Report it privately. See SECURITY.md. Do not paste a vulnerability here. -->
+<!-- Security issue? Report it privately. See https://github.com/ohallord/media-manager/security/policy. Do not paste a vulnerability here. -->
 
 **What happened**
 

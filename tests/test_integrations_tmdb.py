@@ -153,6 +153,31 @@ class TestTMDbGetMovieDetails(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await client.get_movie_details(550))
 
 
+class TestTMDbGetCollection(unittest.IsolatedAsyncioTestCase):
+    async def test_no_api_key(self):
+        client = TMDbClient(api_key="")
+        self.assertIsNone(await client.get_collection(10))
+
+    @patch(PATCH_TARGET)
+    async def test_success(self, mock_ac):
+        mock_ac.return_value = _mock_client(_response(200, {"id": 10, "name": "Star Wars Collection", "parts": []}))
+        client = TMDbClient(api_key="k")
+        result = await client.get_collection(10)
+        self.assertEqual(result["name"], "Star Wars Collection")
+
+    @patch(PATCH_TARGET)
+    async def test_non_200(self, mock_ac):
+        mock_ac.return_value = _mock_client(_response(404))
+        client = TMDbClient(api_key="k")
+        self.assertIsNone(await client.get_collection(10))
+
+    @patch(PATCH_TARGET)
+    async def test_exception(self, mock_ac):
+        mock_ac.return_value = _mock_client(raise_exc=RuntimeError("boom"))
+        client = TMDbClient(api_key="k")
+        self.assertIsNone(await client.get_collection(10))
+
+
 class TestTMDbExtractTrailerUrl(unittest.TestCase):
     def test_none_details(self):
         self.assertIsNone(TMDbClient.extract_trailer_url(None))

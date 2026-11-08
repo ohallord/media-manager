@@ -4,6 +4,7 @@ window.loadMyRequests = async function() {
     if (!container) return;
 
     container.innerHTML = '<div class="loading-spinner">Loading your requests...</div>';
+    loadMyRequestsNotifyPref();
 
     try {
         const [reqRes, qRes] = await Promise.all([
@@ -82,4 +83,38 @@ function renderMyRequests(data) {
             </article>
         `;
     }).join('')}</div>`;
+}
+
+// "Email me when my requests are ready" (User.notify_on_available)
+async function loadMyRequestsNotifyPref() {
+    const box = document.getElementById('my-requests-notify');
+    const hint = document.getElementById('my-requests-notify-hint');
+    if (!box) return;
+    try {
+        const res = await fetch('/api/v1/auth/me');
+        const data = await parseApiJson(res);
+        const me = (data && data.user) || {};
+        box.checked = me.notify_on_available !== false;
+        if (hint) hint.style.display = me.has_email ? 'none' : '';
+    } catch (err) {
+        // Leave the checkbox as-is; saving still reports errors.
+    }
+    if (box.dataset.bound) return;
+    box.dataset.bound = '1';
+    box.addEventListener('change', async () => {
+        const wanted = box.checked;
+        try {
+            const res = await fetch('/api/v1/auth/me/notifications', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notify_on_available: wanted }),
+            });
+            const data = await parseApiJson(res);
+            if (!res.ok) throw new Error(data.detail || 'Could not save');
+            showToast(wanted ? "We'll email you when your requests are ready." : 'Request emails turned off.', 'success');
+        } catch (err) {
+            box.checked = !wanted;
+            showToast(`Could not save: ${err.message}`);
+        }
+    });
 }

@@ -24,6 +24,7 @@ from media_manager.integrations.sonarr import SonarrClient
 from media_manager.integrations.sabnzbd import SABnzbdClient
 from media_manager.integrations.fanart import FanartClient
 from media_manager.integrations.tmdb import TMDbClient
+from media_manager.web.services import request_status
 from media_manager.integrations.syncthing import SyncthingClient
 
 logger = logging.getLogger(__name__)
@@ -2626,129 +2627,17 @@ async def get_my_requests(
     if not username:
         raise HTTPException(status_code=401, detail="Could not determine current user.")
 
-    res = await db.execute(
-        select(AppLogEvent).where(AppLogEvent.event_tag == "[MEDIA_REQUEST]").order_by(AppLogEvent.created_at.desc())
-    )
-    events = res.scalars().all()
-
-    requests_list = []
-    seen_keys = set()
-    for ev in events:
-        req_username = None
-        tmdb_id = None
-        tvdb_id = None
-        title = None
-        media_type = None
-
-        if ev.context_json:
-            try:
-                data = json.loads(ev.context_json)
-                req_username = data.get("username")
-                if data.get("tmdb_id") is not None:
-                    tmdb_id = int(data["tmdb_id"])
-                if data.get("tvdb_id") is not None:
-                    tvdb_id = int(data["tvdb_id"])
-                title = data.get("title")
-            except Exception:
-                pass
-
-        if not req_username and ev.message:
-            import re
-            m = re.search(r"User '([^']+)' requested (movie|TV show) '([^']+)'", ev.message)
-            if m:
-                req_username = m.group(1)
-                media_type = "movie" if m.group(2) == "movie" else "tv"
-                title = m.group(3)
-                m_id = re.search(r"\(TMDb:\s*(\d+)\)", ev.message)
-                if m_id:
-                    tmdb_id = int(m_id.group(1))
-                m_id_tv = re.search(r"\(TVDb:\s*(\d+)\)", ev.message)
-                if m_id_tv:
-                    tvdb_id = int(m_id_tv.group(1))
-
-        if req_username != username or not title:
-            continue
-
-        if media_type is None:
-            media_type = "tv" if tvdb_id else "movie"
-
-        dedupe_key = ("tmdb", tmdb_id) if tmdb_id else (("tvdb", tvdb_id) if tvdb_id else ("title", title.lower().strip()))
-        if dedupe_key in seen_keys:
-            continue
-        seen_keys.add(dedupe_key)
-
-        # Events are already ordered newest-first, so the first occurrence of
-        # a given dedupe_key is the most recent request for that title.
-        requests_list.append({
-            "title": title,
-            "media_type": media_type,
-            "tmdb_id": tmdb_id,
-            "tvdb_id": tvdb_id,
-            "requested_at": ev.created_at.isoformat(),
-            "status": "requested"
-        })
-
+    requests_list = await request_status.load_requests(db, username=username)
     if not requests_list:
         return {"count": 0, "requests": []}
-
-    local_res = await db.execute(select(MediaItem.title, MediaItem.media_type))
-    movie_titles = set()
-    tv_titles = set()
-    for t, mtype in local_res.all():
-        (movie_titles if mtype == "movie" else tv_titles).add(t.lower().strip())
+    await request_status.apply_statuses(db, requests_list, RadarrClient, SonarrClient, SHARED_HTTP_CLIENT)
+    for r in requests_list:
+        r.pop("username", None)
+        r.pop("dedupe_key", None)
+        r["requested_at"] = r["requested_at"].isoformat()
 
     tmdb_res = await db.execute(select(IntegrationConfig).where(IntegrationConfig.service_name == "tmdb"))
     tmdb_cfg = tmdb_res.scalar_one_or_none()
-
-    radarr_has_file: Dict[int, bool] = {}
-    radarr_queue_tmdb_ids = set()
-    r_cfg_res = await db.execute(select(IntegrationConfig).where(IntegrationConfig.service_name == "radarr"))
-    radarr_cfg = r_cfg_res.scalar_one_or_none()
-    if radarr_cfg and radarr_cfg.enabled:
-        try:
-            rc = RadarrClient(radarr_cfg.api_url, radarr_cfg.api_key_encrypted, http_client=SHARED_HTTP_CLIENT)
-            movies = await rc.get_movies()
-            radarr_has_file = {m.get("tmdbId"): m.get("hasFile", False) for m in movies if m.get("tmdbId")}
-            movie_id_to_tmdb = {m.get("id"): m.get("tmdbId") for m in movies if m.get("tmdbId")}
-            for q in await rc.get_queue():
-                tmdb_id_for_queue_item = movie_id_to_tmdb.get(q.get("movieId"))
-                if tmdb_id_for_queue_item:
-                    radarr_queue_tmdb_ids.add(tmdb_id_for_queue_item)
-        except Exception as e:
-            logger.error(f"Error checking Radarr status for my-requests: {e}")
-
-    sonarr_has_file: Dict[int, bool] = {}
-    sonarr_queue_tvdb_ids = set()
-    s_cfg_res = await db.execute(select(IntegrationConfig).where(IntegrationConfig.service_name == "sonarr"))
-    sonarr_cfg = s_cfg_res.scalar_one_or_none()
-    if sonarr_cfg and sonarr_cfg.enabled:
-        try:
-            sc = SonarrClient(sonarr_cfg.api_url, sonarr_cfg.api_key_encrypted, http_client=SHARED_HTTP_CLIENT)
-            series_list = await sc.get_series()
-            sonarr_has_file = {
-                s.get("tvdbId"): (s.get("statistics") or {}).get("episodeFileCount", 0) > 0
-                for s in series_list if s.get("tvdbId")
-            }
-            series_id_to_tvdb = {s.get("id"): s.get("tvdbId") for s in series_list if s.get("tvdbId")}
-            for q in await sc.get_queue():
-                tvdb_id_for_queue_item = series_id_to_tvdb.get(q.get("seriesId"))
-                if tvdb_id_for_queue_item:
-                    sonarr_queue_tvdb_ids.add(tvdb_id_for_queue_item)
-        except Exception as e:
-            logger.error(f"Error checking Sonarr status for my-requests: {e}")
-
-    for r in requests_list:
-        title_clean = r["title"].lower().strip()
-        if r["media_type"] == "movie":
-            if title_clean in movie_titles or radarr_has_file.get(r["tmdb_id"], False):
-                r["status"] = "available"
-            elif r["tmdb_id"] in radarr_queue_tmdb_ids:
-                r["status"] = "downloading"
-        else:
-            if title_clean in tv_titles or sonarr_has_file.get(r["tvdb_id"], False):
-                r["status"] = "available"
-            elif r["tvdb_id"] in sonarr_queue_tvdb_ids:
-                r["status"] = "downloading"
 
     # Enrich with the same poster/overview/cast/trailer detail the other
     # discovery pages (Coming Soon, Trending) show inline, rather than a bare
@@ -2981,11 +2870,15 @@ async def get_media_detail_full(
     if not title:
         raise HTTPException(status_code=404, detail="Could not find this title on TMDb.")
 
+    collection_raw: Optional[Dict[str, Any]] = None
     if type == "movie":
-        recs, similar, providers = await asyncio.gather(
+        collection_ref = details.get("belongs_to_collection")
+        collection_id = collection_ref.get("id") if isinstance(collection_ref, dict) else None
+        recs, similar, providers, collection_raw = await asyncio.gather(
             client.get_movie_recommendations(tmdb_id),
             client.get_similar_movies(tmdb_id),
-            client.get_movie_watch_providers(tmdb_id)
+            client.get_movie_watch_providers(tmdb_id),
+            client.get_collection(collection_id) if collection_id else _none_async(),
         )
         runtime = details.get("runtime")
     else:
@@ -3130,6 +3023,10 @@ async def get_media_detail_full(
             "status": compute_status(rid, rtitle, r_tvdb_id)
         })
 
+    collection = _build_collection_summary(
+        collection_raw, tmdb_id, lambda pid, ptitle: compute_status(pid, ptitle, None)
+    )
+
     return {
         "tmdb_id": tmdb_id,
         "tvdb_id": tvdb_id,
@@ -3149,8 +3046,55 @@ async def get_media_detail_full(
         "status": compute_status(tmdb_id, title, tvdb_id),
         "requested_by": requested_by,
         "related": related,
+        "collection": collection,
         "local_files": local_files,
         "playback": playback_summary,
+    }
+
+
+async def _none_async() -> None:
+    return None
+
+
+def _build_collection_summary(
+    collection_raw: Optional[Dict[str, Any]],
+    current_tmdb_id: int,
+    status_for,
+) -> Optional[Dict[str, Any]]:
+    """
+    Shapes a TMDb /collection/{id} payload into "you own X of Y" progress for
+    the title detail modal. Parts are ordered by release date (undated last);
+    `status_for(tmdb_id, title)` is the caller's in_library/in_radarr/not_added
+    resolver so ownership matches the rest of the modal.
+    """
+    if not isinstance(collection_raw, dict) or not collection_raw.get("id"):
+        return None
+    parts = []
+    for part in collection_raw.get("parts") or []:
+        pid = part.get("id")
+        ptitle = part.get("title")
+        if not pid or not ptitle:
+            continue
+        release_date = part.get("release_date") or ""
+        parts.append({
+            "tmdb_id": pid,
+            "title": ptitle,
+            "release_date": release_date or None,
+            "year": release_date[:4] or None,
+            "poster_url": f"https://image.tmdb.org/t/p/w342{part['poster_path']}" if part.get("poster_path") else None,
+            "status": status_for(pid, ptitle),
+            "is_current": pid == current_tmdb_id,
+        })
+    if not parts:
+        return None
+    parts.sort(key=lambda p: (p["release_date"] is None, p["release_date"] or ""))
+    return {
+        "id": collection_raw["id"],
+        "name": collection_raw.get("name") or "Collection",
+        "total": len(parts),
+        "owned_count": sum(1 for p in parts if p["status"] == "in_library"),
+        "added_count": sum(1 for p in parts if p["status"] in ("in_library", "in_radarr")),
+        "parts": parts,
     }
 
 # Directory for cached resized image thumbnails
