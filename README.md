@@ -212,10 +212,13 @@ CI runs the same commands on every push and fails below 90% line coverage.
 
 ## Getting help
 
-- Questions and bug reports: open an issue and pick a template.
+- Questions and ideas: ask in [Discussions](https://github.com/ohallord/media-manager/discussions).
+- Bug reports and feature requests: open an issue and pick a template.
 - Code changes: read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 - Security problems: don't open a public issue. Follow the [security policy](https://github.com/ohallord/media-manager/security/policy).
 - Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) applies everywhere in the project.
+- Who decides, and how: [GOVERNANCE.md](GOVERNANCE.md). What's next: [ROADMAP.md](ROADMAP.md).
+- What the security model covers: [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 ## What I'd change
 

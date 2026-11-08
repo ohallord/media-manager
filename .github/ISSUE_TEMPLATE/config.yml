@@ -1,4 +1,8 @@
 blank_issues_enabled: false
-# Private vulnerability reporting is not confirmed for this repository.
-# Do not add an advisories contact link until that setting is verified.
-# Report vulnerabilities privately: https://github.com/ohallord/media-manager/security/policy
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/ohallord/media-manager/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
+  - name: Ask a question or share an idea
+    url: https://github.com/ohallord/media-manager/discussions
+    about: Use Discussions for questions, setup help, and early ideas.
