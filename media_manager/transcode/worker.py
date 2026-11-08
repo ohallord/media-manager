@@ -587,12 +587,35 @@ class Worker:
             finally:
                 self._release_lease()
 
+    def _recovery_path_problem(self, src: str, output: str, temp: str, backup: str) -> Optional[str]:
+        """
+        Recovery renames and deletes the paths the job record names, so confine
+        them like the normal path does: inside a media/source root, with temp
+        beside the output and the backup beside the source (fsops.*_path_for).
+        """
+        roots = self.cfg.media_dirs + self.cfg.source_dirs
+        real = {name: os.path.realpath(p) for name, p in
+                (("source", src), ("output", output), ("temp", temp), ("backup", backup))}
+        for name, path in real.items():
+            if not fsops.is_inside(path, roots):
+                return f"{name} {path}"
+        if os.path.dirname(real["temp"]) != os.path.dirname(real["output"]):
+            return f"temp {real['temp']} is not beside the output"
+        if os.path.dirname(real["backup"]) != os.path.dirname(real["source"]):
+            return f"backup {real['backup']} is not beside the source"
+        return None
+
     def _recover(self, job: Dict[str, Any]) -> None:
         src = job["source_path"]
         output = job.get("output_path") or fsops.output_path_for(src)
         temp = job.get("temp_path") or fsops.temp_path_for(output, job["id"])
         backup = job.get("backup_path") or fsops.backup_path_for(src)
         backup = fsops.find_backup(backup) or backup
+        bad = self._recovery_path_problem(src, output, temp, backup)
+        if bad:
+            logger.warning(f"[TRANSCODE_WORKER] Not recovering {job.get('id')}: {bad}")
+            self.client.fail(job["id"], "needs_manual_review", f"path outside allowed roots: {bad}; nothing was changed")
+            return
         same = output == src
         exists = {"source": os.path.exists(src), "backup": os.path.exists(backup),
                   "temp": os.path.exists(temp), "output": os.path.exists(output)}

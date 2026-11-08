@@ -756,6 +756,75 @@ class TestRunLoopAndRecovery(WorkerTestBase):
             self.assertEqual(fh.read(), b"old")
         self.assertIn("restored", client.failures()[0][1])
 
+    def _assert_recover_refused(self, job, keep):
+        client = FakeClient(inflight=[job])
+        with patch.object(worker_mod.os, "rename") as rename, \
+                patch.object(worker_mod.fsops, "remove_quietly") as remove:
+            self.make_worker(client).recover_inflight()
+        rename.assert_not_called()
+        remove.assert_not_called()
+        for path in keep:
+            self.assertTrue(os.path.exists(path), path)
+        self.assertEqual(len(client.failures()), 1)
+        code, message = client.failures()[0]
+        self.assertEqual(code, "needs_manual_review")
+        self.assertIn("path outside allowed roots", message)
+
+    def test_recover_refuses_paths_outside_allowed_roots(self):
+        outside = os.path.join(self.tmp, "outside")
+        os.makedirs(outside)
+        victim = os.path.join(outside, "victim.mkv")
+        self._write(victim, b"precious")
+        good = self._recovery_job()
+        cases = {
+            "source": dict(source_path=victim, phase="swapped", output_hash="deadbeef"),
+            "output": dict(output_path=victim, phase="swapped", output_hash="deadbeef"),
+            "temp": dict(temp_path=victim, phase="encoding"),
+            "backup": dict(backup_path=victim, phase="swapped", output_hash="deadbeef"),
+            "dotdot": dict(temp_path=os.path.join(self.lib, "Movie", "..", "..", "outside", "victim.mkv"),
+                           phase="encoding"),
+            "etc": dict(temp_path="/etc/passwd", phase="encoding"),
+        }
+        for name, kw in cases.items():
+            with self.subTest(name):
+                self._write(good["source_path"], b"old")
+                self._write(good["output_path"], b"new")
+                self._assert_recover_refused(self._recovery_job(**kw), [victim, good["source_path"]])
+
+    def test_recover_refuses_temp_or_backup_in_another_folder(self):
+        other = os.path.join(self.lib, "Other")
+        os.makedirs(other)
+        stray = os.path.join(other, "stray.mkv")
+        self._write(stray, b"keep")
+        for kw in (dict(temp_path=stray, phase="encoding"),
+                   dict(backup_path=stray, phase="swapped", output_hash="deadbeef")):
+            with self.subTest(kw):
+                self._write(self._recovery_job()["output_path"], b"new")
+                self._assert_recover_refused(self._recovery_job(**kw), [stray])
+
+    def test_recover_refuses_symlink_escape(self):
+        outside = os.path.join(self.tmp, "outside")
+        os.makedirs(outside)
+        victim = os.path.join(outside, "victim.mkv")
+        self._write(victim, b"precious")
+        link = os.path.join(self.lib, "Movie", ".M.rec12345.mm-partial")
+        os.symlink(victim, link)
+        self._assert_recover_refused(self._recovery_job(temp_path=link, phase="encoding"), [victim])
+
+    def test_recover_allows_source_dirs(self):
+        dl = os.path.join(self.tmp, "downloads")
+        os.makedirs(dl)
+        src = os.path.join(dl, "M.mp4")
+        job = self._recovery_job(source_path=src, output_path=os.path.join(dl, "M.mkv"),
+                                 temp_path=os.path.join(dl, ".M.rec12345.mm-partial"),
+                                 backup_path=fsops.backup_path_for(src), phase="encoding")
+        self._write(src, b"old")
+        self._write(job["temp_path"])
+        client = FakeClient(inflight=[job])
+        self.make_worker(client, cfg={"source_dirs": [dl]}).recover_inflight()
+        self.assertFalse(os.path.exists(job["temp_path"]))
+        self.assertEqual(client.failures()[0][0], "worker_lost")
+
     def test_recovery_exception_is_reported(self):
         client = FakeClient(inflight=[{"id": "bad"}])  # missing keys -> KeyError
         self.make_worker(client).recover_inflight()

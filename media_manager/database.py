@@ -10,9 +10,17 @@ logger = logging.getLogger(__name__)
 Base = declarative_base()
 
 # Check if PostgreSQL is explicitly configured or if fallback SQLite should be used
-USE_POSTGRES = os.getenv("USE_POSTGRES", "false").lower() in ["true", "1", "yes"]
+def _use_postgres(requested: bool, uri: str) -> bool:
+    if not requested:
+        return False
+    if not uri:
+        raise RuntimeError("USE_POSTGRES=true requires POSTGRES_URI")
+    return "postgresql" in uri
 
-if USE_POSTGRES and "postgresql" in POSTGRES_URI:
+
+USE_POSTGRES = _use_postgres(os.getenv("USE_POSTGRES", "false").lower() in ["true", "1", "yes"], POSTGRES_URI)
+
+if USE_POSTGRES:
     async_engine = create_async_engine(
         POSTGRES_URI,
         echo=False,

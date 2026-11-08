@@ -292,3 +292,40 @@ class TestSqlitePragmas(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPostgresConfig(unittest.TestCase):
+    """USE_POSTGRES=true must never fall back to baked-in default credentials."""
+
+    def _import_with(self, env):
+        import subprocess
+        import sys
+        full = {k: v for k, v in os.environ.items() if k not in ("POSTGRES_URI", "SYNC_POSTGRES_URI")}
+        full.update(env)
+        return subprocess.run([sys.executable, "-c", "import media_manager.database"],
+                              env=full, capture_output=True, text=True, timeout=60)
+
+    def test_use_postgres_without_uri_fails_at_import(self):
+        result = self._import_with({"USE_POSTGRES": "true"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("USE_POSTGRES=true requires POSTGRES_URI", result.stderr)
+
+    def test_no_default_credentials_in_config(self):
+        from media_manager import config
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("POSTGRES_URI", None)
+            self.assertNotIn("mediapass", config._postgres_uri_from_env())
+            self.assertEqual(config._postgres_uri_from_env(), "")
+
+    def test_use_postgres_helper(self):
+        self.assertFalse(database._use_postgres(False, ""))
+        self.assertFalse(database._use_postgres(False, "postgresql+asyncpg://u:p@h/db"))
+        self.assertTrue(database._use_postgres(True, "postgresql+asyncpg://u:p@h/db"))
+        with self.assertRaisesRegex(RuntimeError, "USE_POSTGRES=true requires POSTGRES_URI"):
+            database._use_postgres(True, "")
+
+    def test_sync_uri_derived_only_when_set(self):
+        from media_manager import config
+        self.assertEqual(config._sync_postgres_uri(""), "")
+        self.assertEqual(config._sync_postgres_uri("postgresql+asyncpg://u:p@h/db"), "postgresql+psycopg2://u:p@h/db")
+        self.assertEqual(config._sync_postgres_uri("postgresql://u:p@h/db"), "postgresql://u:p@h/db")

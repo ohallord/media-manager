@@ -85,7 +85,7 @@ rest runs on defaults: SQLite database, no external integrations configured.
 | `WEB_PORT` | `8088` | Web server port |
 | `DB_PATH` | `media_manager/media.db` | SQLite file path (used unless `USE_POSTGRES=true`) |
 | `USE_POSTGRES` | `false` | Set `true` to use Postgres instead of SQLite |
-| `POSTGRES_URI` | `postgresql+asyncpg://mediauser:mediapass@localhost:5432/mediadb` | Async SQLAlchemy URI, only read if `USE_POSTGRES=true` |
+| `POSTGRES_URI` | none | Async SQLAlchemy URI. Required when `USE_POSTGRES=true` (startup fails without it), no default |
 | `SYNC_POSTGRES_URI` | derived from `POSTGRES_URI` | Sync driver URI (for CLI commands); auto-derived, rarely needs setting directly |
 | `JWT_SECRET` | random, persisted to `JWT_SECRET_FILE` | Signs session tokens. Set it explicitly for multi-replica or Helm deploys. If unset (or set to the old public default `dev-secret-key-change-in-production`), a random key is generated and saved with mode 0600; if that file can't be written, an in-memory key is used and every restart logs everyone out |
 | `JWT_SECRET_FILE` | `.jwt_secret` next to `DB_PATH` | Where the generated `JWT_SECRET` is kept |
@@ -254,10 +254,14 @@ last-played timestamps from any combination of Plex, Emby, and Jellyfin,
 matches them to your inventory, and shows them on Inventory cards, the
 title detail modal, and **Admin → Playback**. The Library Cleanup wizard
 uses the same data to suggest unwatched titles. Like Radarr/Sonarr, these
-sources are configured in the database via the API rather than environment
-variables. There is still no Admin form for the URL and token, so use
-`curl` (as an already logged-in admin, reusing your session cookie or
-bearer token):
+sources are stored in the database rather than environment variables.
+
+Open **Admin → Setup → Media servers**, expand Plex, Emby, or Jellyfin, enter
+the server URL and token, and click **Test**, then **Save**. **Sync now** runs
+a sync immediately.
+
+To script it instead, use the API as an already logged-in admin (reusing
+your session cookie or bearer token):
 
 ```bash
 # Plex: api_key is a Plex token (Settings > Account, or see
@@ -275,8 +279,10 @@ curl -X PUT http://localhost:8088/api/v1/playback/config/jellyfin \
 
 If the media server sees your library under a different mount path than
 this app does (e.g. a container sees `/data/Movies` while this app scanned
-`/mnt/Movies`), add `"path_mappings": [{"source_prefix": "/data", "local_prefix": "/mnt"}]`
-to the request body so the sync can still match files by path.
+`/mnt/Movies`), add a path mapping so the sync can still match files by path: one
+`/data => /mnt` line in the form's **Path mappings** box, or
+`"path_mappings": [{"source_prefix": "/data", "local_prefix": "/mnt"}]` in the
+API request body.
 
 Trigger a sync immediately with `POST /api/v1/playback/sync` (admin) or
 `python3 main.py sync-playback`, instead of waiting for the scheduled
