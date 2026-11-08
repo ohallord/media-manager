@@ -434,6 +434,14 @@
                     <p class="muted mb-3" style="font-size: 0.9rem;">Open a service to set its URL and key.</p>
                     <div id="admin-integrations-list"></div>
                 </div>
+                <div class="section-card mb-3">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <h3 style="margin: 0;">Media servers</h3>
+                        <button class="btn btn-secondary" onclick="triggerPlaybackSync()" style="padding: 4px 10px; font-size: 0.75rem;">Sync now</button>
+                    </div>
+                    <p class="muted mb-3" style="font-size: 0.9rem;">Plex, Emby, and Jellyfin supply play counts for Playback and Cleanup.</p>
+                    <div id="admin-playback-sources-list"></div>
+                </div>
             </section>
 
             <section id="view-paths" class="view-section">
@@ -522,7 +530,7 @@
     <script src="/static/js/help.js?v=1.0"></script>
     <script src="/static/js/logs.js?v=10.2"></script>
     <script src="/static/js/admin_users.js?v=1.2.3"></script>
-    <script src="/static/js/admin_integrations.js?v=10.4"></script>
+    <script src="/static/js/admin_integrations.js?v=10.5"></script>
     <script src="/static/js/admin_playback.js?v=1.0"></script>
     <script>
         window.loadAdminView = function() {

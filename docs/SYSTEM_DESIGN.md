@@ -412,7 +412,9 @@ flowchart TD
   `GET`/`PUT /config/{service}` and `POST /test/{service}` for
   plex/emby/jellyfin (separate from the generic
   `/api/v1/integrations/config` endpoint, which has no field for path
-  mappings), `POST /sync` to trigger a sync immediately, and
+  mappings; the **Admin → Setup → Media servers** form in
+  `admin_integrations.js` drives these and always re-sends the mappings,
+  since `PUT` replaces them), `POST /sync` to trigger a sync immediately, and
   `GET /items` / `GET /series` (grouped via the existing
   `get_tv_show_name`, since there's no dedicated series table) to read the
   merged data back - filterable by `media_type`, `unplayed_only`, and
@@ -723,7 +725,11 @@ from the CI-synced checkout `~/media-manager-worker` with the system python3
   returned by `/inflight`: before the swap → clean up and requeue; between the
   renames → finish if the temp file's hash matches, else restore the backup;
   after → complete if the hash matches, else roll back; anything else →
-  `needs_manual_review` with nothing touched.
+  `needs_manual_review` with nothing touched. The job record's paths are not
+  trusted: each is resolved (`realpath`) and must sit inside `media_dirs` or
+  `source_dirs`, with the temp file beside the output and the backup beside the
+  source. Otherwise the job goes to `needs_manual_review` ("path outside allowed
+  roots") before any rename or delete.
 - **Signals**: SIGTERM stops and requeues an encode (`worker_shutdown`, no
   attempt used); the two renames are never interrupted.
 - **Deploys**: CI rsyncs the checkout before the pod rolls; on a new
@@ -807,6 +813,10 @@ from the CI-synced checkout `~/media-manager-worker` with the system python3
 ---
 
 ## 15. Database Schema Models (`models.py`)
+
+SQLite (`DB_PATH`) is the default. `USE_POSTGRES=true` needs an explicit
+`POSTGRES_URI`: there are no built-in credentials, and `database.py` raises at
+import when the URI is empty. `SYNC_POSTGRES_URI` is derived only from a set URI.
 
 - **`User`**: credentials (password hashes), role, and 2FA status columns.
 - **`PasskeyCredential`**: WebAuthn credential public keys mapped to user profiles.

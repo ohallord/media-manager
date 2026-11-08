@@ -100,6 +100,18 @@ class TestPlaybackConfigEndpoints(TestApiPlaybackBase):
         self.assertEqual(configs[0]["api_url"], "http://plex:32400")
         self.assertEqual(configs[0]["path_mappings"], [{"source_prefix": "/data", "local_prefix": "/mnt"}])
 
+    def test_put_without_path_mappings_clears_them(self):
+        # The Setup form relies on this: it always re-sends the mappings it shows.
+        self.client.put(
+            "/api/v1/playback/config/emby",
+            json={"api_url": "http://e", "api_key": "k",
+                  "path_mappings": [{"source_prefix": "/data", "local_prefix": "/mnt"}]},
+        )
+        self.client.put("/api/v1/playback/config/emby", json={"api_url": "http://e", "api_key": "k"})
+
+        configs = self.client.get("/api/v1/playback/config").json()["configs"]
+        self.assertEqual(configs[0]["path_mappings"], [])
+
     def test_put_updates_existing_row(self):
         self.client.put("/api/v1/playback/config/plex", json={"api_url": "http://old", "api_key": "k1"})
         self.client.put("/api/v1/playback/config/plex", json={"api_url": "http://new", "api_key": "k2"})

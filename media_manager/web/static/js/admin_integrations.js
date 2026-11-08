@@ -19,6 +19,7 @@ window.loadAdminIntegrations = async function() {
         const data = await res.json();
 
         renderAdminIntegrations(data.configs, container);
+        window.loadAdminPlaybackSources();
         if (typeof window.refreshWatcherHeartbeat === 'function') window.refreshWatcherHeartbeat();
     } catch (err) {
         container.innerHTML = `<p class="error-msg">${escapeHtml(err.message)}</p>`;
@@ -116,14 +117,15 @@ function renderAdminIntegrations(configs, container) {
     }).join('');
 }
 
-function integrationRow(srv, statusClass, status, fields) {
+function integrationRow(srv, statusClass, status, fields, onsubmit) {
+    const submit = onsubmit || `saveIntegrationConfig(event, '${srv.name}')`;
     return `
         <div class="section-card mb-3" id="integration-card-${srv.name}">
             <button type="button" class="integration-row" onclick="window.toggleIntegration('${srv.name}')">
                 <span>${srv.title}</span>
                 <span class="badge ${statusClass}" id="badge-${srv.name}">${status}</span>
             </button>
-            <form id="integration-form-${srv.name}" class="integration-form" hidden onsubmit="saveIntegrationConfig(event, '${srv.name}')">
+            <form id="integration-form-${srv.name}" class="integration-form" hidden onsubmit="${submit}">
                 ${fields}
             </form>
         </div>`;
@@ -134,6 +136,150 @@ window.toggleIntegration = function(name) {
     const willOpen = target && target.hidden;
     document.querySelectorAll('.integration-form').forEach(el => { el.hidden = true; });
     if (target && willOpen) target.hidden = false;
+};
+
+// --- Media servers (Plex/Emby/Jellyfin playback sources) ---------------------
+
+const PLAYBACK_SOURCE_SERVICES = [
+    { name: 'plex', title: 'Plex', defaultUrl: 'http://localhost:32400', keyHelp: 'Plex token (X-Plex-Token)' },
+    { name: 'emby', title: 'Emby', defaultUrl: 'http://localhost:8096', keyHelp: 'Dashboard -> Advanced -> API Keys' },
+    { name: 'jellyfin', title: 'Jellyfin', defaultUrl: 'http://localhost:8096', keyHelp: 'Dashboard -> Advanced -> API Keys' }
+];
+
+// "source_prefix => local_prefix" per line -> [{source_prefix, local_prefix}].
+// Blank and malformed lines are dropped.
+function parsePathMappings(text) {
+    return String(text || '').split('\n').map(line => {
+        const idx = line.indexOf('=>');
+        if (idx < 0) return null;
+        const source = line.slice(0, idx).trim();
+        const local = line.slice(idx + 2).trim();
+        return source && local ? { source_prefix: source, local_prefix: local } : null;
+    }).filter(Boolean);
+}
+
+function formatPathMappings(mappings) {
+    return (mappings || []).map(m => `${m.source_prefix} => ${m.local_prefix}`).join('\n');
+}
+
+window.loadAdminPlaybackSources = async function() {
+    const container = document.getElementById('admin-playback-sources-list');
+    if (!container) return;
+    try {
+        const res = await fetch('/api/v1/playback/config');
+        if (res.status === 401 || res.status === 403) {
+            container.innerHTML = '<p class="muted">Sign in as an admin to manage media servers.</p>';
+            return;
+        }
+        if (!res.ok) throw new Error('Failed to load media server configurations.');
+        const data = await parseApiJson(res);
+        renderAdminPlaybackSources(data.configs, container);
+    } catch (err) {
+        container.innerHTML = `<p class="error-msg">${escapeHtml(err.message)}</p>`;
+    }
+};
+
+function renderAdminPlaybackSources(configs, container) {
+    const configMap = {};
+    (configs || []).forEach(c => configMap[c.service_name] = c);
+
+    container.innerHTML = PLAYBACK_SOURCE_SERVICES.map(srv => {
+        const pb = configMap[srv.name] || { api_url: '', api_key: '', enabled: true, status: 'NOT_CONFIGURED', path_mappings: [] };
+        const badgeClass = pb.status === 'HEALTHY' ? 'badge-4k' : 'badge-sd';
+        const row = { name: `pb-${srv.name}`, title: srv.title };
+        const label = 'font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;';
+        return integrationRow(row, badgeClass, escapeHtml(pb.status || 'UNKNOWN'), `
+                    <div>
+                        <label style="${label}">Server URL</label>
+                        <input type="text" id="pb-url-${srv.name}" placeholder="${srv.defaultUrl}" value="${escapeHtml(pb.api_url || srv.defaultUrl)}" required class="search-input" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label style="${label}">Token / API key (${srv.keyHelp})</label>
+                        <input type="password" id="pb-key-${srv.name}" placeholder="Enter token" value="${escapeHtml(pb.api_key || '')}" required class="search-input" style="width: 100%;">
+                    </div>
+                    <div>
+                        <label style="${label}">Path mappings (optional, one per line: <code>/server/path =&gt; /local/path</code>)</label>
+                        <textarea id="pb-maps-${srv.name}" rows="2" class="search-input" style="width: 100%; font-family: monospace;" placeholder="/data => /mnt">${escapeHtml(formatPathMappings(pb.path_mappings))}</textarea>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="pb-enabled-${srv.name}" ${pb.enabled ? 'checked' : ''} style="cursor: pointer;">
+                        <label for="pb-enabled-${srv.name}" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">Include in playback sync</label>
+                    </div>
+                    <div id="extra-options-pb-${srv.name}" class="mt-2"></div>
+                    <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="testPlaybackSource('${srv.name}')">Test</button>
+                    </div>
+        `, `savePlaybackSource(event, '${srv.name}')`);
+    }).join('');
+}
+
+function readPlaybackSourceForm(svc) {
+    return {
+        api_url: document.getElementById(`pb-url-${svc}`).value.trim(),
+        api_key: document.getElementById(`pb-key-${svc}`).value.trim(),
+        enabled: document.getElementById(`pb-enabled-${svc}`).checked,
+        // Always sent: the PUT replaces stored mappings, so omitting them would wipe them.
+        path_mappings: parsePathMappings(document.getElementById(`pb-maps-${svc}`).value)
+    };
+}
+
+async function savePlaybackSource(event, svc) {
+    event.preventDefault();
+    try {
+        const res = await fetch(`/api/v1/playback/config/${svc}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(readPlaybackSourceForm(svc))
+        });
+        if (!res.ok) throw new Error('Failed to save media server settings');
+        showToast(`${svc} settings saved.`);
+        window.loadAdminPlaybackSources();
+    } catch (err) {
+        showToast(err.message);
+    }
+}
+
+async function testPlaybackSource(svc) {
+    const badge = document.getElementById(`badge-pb-${svc}`);
+    const extra = document.getElementById(`extra-options-pb-${svc}`);
+    const body = readPlaybackSourceForm(svc);
+    if (!body.api_url || !body.api_key) {
+        showToast('Enter a URL and token before testing.');
+        return;
+    }
+    if (badge) badge.textContent = 'Testing...';
+    try {
+        const res = await fetch(`/api/v1/playback/test/${svc}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error('Test failed');
+        const data = await parseApiJson(res);
+        if (badge) {
+            badge.textContent = data.healthy ? 'HEALTHY' : 'UNREACHABLE';
+            badge.className = `badge ${data.healthy ? 'badge-4k' : 'badge-sd'}`;
+        }
+        if (extra) {
+            extra.innerHTML = data.healthy
+                ? '<div style="font-size: 0.85rem; color: var(--success); margin-top: 0.5rem; font-weight: 600;">✅ Connection successful</div>'
+                : '<div style="font-size: 0.85rem; color: var(--danger); margin-top: 0.5rem;">❌ Connection failed</div>';
+        }
+    } catch (err) {
+        if (badge) badge.textContent = 'ERROR';
+        showToast(`Connection test error: ${err.message}`);
+    }
+}
+
+window.triggerPlaybackSync = async function() {
+    try {
+        const res = await fetch('/api/v1/playback/sync', { method: 'POST' });
+        if (!res.ok) throw new Error('Failed to start playback sync');
+        showToast('Playback sync started.');
+    } catch (err) {
+        showToast(err.message);
+    }
 };
 
 async function testIntegrationConnection(serviceName) {

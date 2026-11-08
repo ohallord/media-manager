@@ -131,6 +131,9 @@ There is no default `JWT_SECRET` either: if it is unset, the app generates a
 random one and stores it next to the database. Changing a password signs out
 every other session.
 
+Connect your services under **Admin → Setup**: Radarr, Sonarr, and the rest
+under Connections, and Plex, Emby, and Jellyfin under Media servers.
+
 To run it with Docker instead:
 
 ```bash

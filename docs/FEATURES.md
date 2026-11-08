@@ -66,7 +66,7 @@ Admins get one email when Radarr, Sonarr, or SABnzbd stops responding or Radarr/
 
 ## Playback tracking (Plex, Emby, Jellyfin)
 
-Background service that pulls per-movie/per-episode play counts and last-played timestamps from any configured combination of Plex, Emby, and Jellyfin, merges them across sources, and shows them on Inventory cards, the TV show total-plays line, and the title detail modal - plus a sortable read-only **Admin → Playback** page (name filter, in-page scroll) listing every movie/series. See [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
+Background service that pulls per-movie/per-episode play counts and last-played timestamps from any configured combination of Plex, Emby, and Jellyfin, merges them across sources, and shows them on Inventory cards, the TV show total-plays line, and the title detail modal - plus a sortable read-only **Admin → Playback** page (name filter, in-page scroll) listing every movie/series. Configure the servers (URL, token, path mappings, Test, Sync now) on **Admin → Setup → Media servers**. See [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
 
 ## Library cleanup wizard (admins only)
 

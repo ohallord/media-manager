@@ -12,8 +12,18 @@ except FileNotFoundError:
     VERSION = "0.0.0-dev"
 
 # Database: SQLite by default (`DB_PATH`). Set USE_POSTGRES=true + POSTGRES_URI for Postgres.
-POSTGRES_URI = os.getenv("POSTGRES_URI", "postgresql+asyncpg://mediauser:mediapass@localhost:5432/mediadb")
-SYNC_POSTGRES_URI = os.getenv("SYNC_POSTGRES_URI", POSTGRES_URI.replace("+asyncpg", "+psycopg2") if "+asyncpg" in POSTGRES_URI else POSTGRES_URI)
+# No default URI: baked-in credentials would silently connect to whatever answers
+# on localhost. database.py fails closed when USE_POSTGRES=true and this is empty.
+def _postgres_uri_from_env() -> str:
+    return os.getenv("POSTGRES_URI", "").strip()
+
+
+def _sync_postgres_uri(uri: str) -> str:
+    return uri.replace("+asyncpg", "+psycopg2") if "+asyncpg" in uri else uri
+
+
+POSTGRES_URI = _postgres_uri_from_env()
+SYNC_POSTGRES_URI = os.getenv("SYNC_POSTGRES_URI") or _sync_postgres_uri(POSTGRES_URI)
 
 # Security & WebAuthn / Passkey Secrets
 # JWT_SECRET is resolved below, after DB_PATH (see _resolve_jwt_secret).
