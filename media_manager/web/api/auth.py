@@ -294,9 +294,27 @@ async def get_me(user: Optional[User] = Depends(get_current_user_optional)):
             "id": user.id,
             "username": user.username,
             "role": user.role,
-            "must_change_password": user.must_change_password
+            "must_change_password": user.must_change_password,
+            "notify_on_available": bool(getattr(user, "notify_on_available", True)),
+            "has_email": bool(user.email),
         }
     }
+
+
+class NotificationPrefsRequest(BaseModel):
+    notify_on_available: bool
+
+
+@router.put("/me/notifications")
+async def update_my_notifications(
+    req: NotificationPrefsRequest,
+    user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """The current user's own 'email me when my requests are ready' setting."""
+    user.notify_on_available = req.notify_on_available
+    await db.commit()
+    return {"notify_on_available": user.notify_on_available, "has_email": bool(user.email)}
 
 class ChangePasswordRequest(BaseModel):
     current_password: str

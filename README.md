@@ -49,8 +49,13 @@ failed or not, gets a row in the audit log.
 
 You can add a title to Radarr or Sonarr from search results, Coming Soon,
 Trending, or the title detail view, and pick the quality profile when you do.
+For a movie that is part of a TMDb collection, the detail view shows every
+film in the collection and how many of them you own.
 The Downloads page merges the Radarr/Sonarr queue with SABnzbd and Syncthing,
 and you can remove, retry, or re-search a stuck grab from there.
+My Requests shows each user what they asked for and whether it is requested,
+downloading, or available. When a request becomes available, the requester
+gets one email (if SMTP is set up), and can turn that off on the same page.
 
 ### GPU H.265 migration
 
@@ -204,6 +209,13 @@ coverage report --fail-under=90
 ```
 
 CI runs the same commands on every push and fails below 90% line coverage.
+
+## Getting help
+
+- Questions and bug reports: open an issue and pick a template.
+- Code changes: read [CONTRIBUTING.md](CONTRIBUTING.md) first.
+- Security problems: don't open a public issue. Follow the [security policy](https://github.com/ohallord/media-manager/security/policy).
+- Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) applies everywhere in the project.
 
 ## What I'd change
 

@@ -306,6 +306,11 @@
                     </div>
                     <h2 class="search-hero-title">My Requests</h2>
                     <p class="search-hero-subtitle">Everything you've requested, and whether it's still being searched for, actively downloading, or already available.</p>
+                    <label class="my-requests-notify" style="display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; cursor: pointer;">
+                        <input type="checkbox" id="my-requests-notify" style="cursor: pointer;">
+                        <span>Email me when my requests are ready</span>
+                    </label>
+                    <p id="my-requests-notify-hint" class="muted" style="display: none; margin-top: 4px;">No email address on your account, so nothing can be sent. Ask an administrator to add one.</p>
                 </div>
                 <div id="my-requests-container" class="mt-4"></div>
             </section>
@@ -525,7 +530,7 @@
     <script src="/static/js/media_calendar_grid.js?v=1.3"></script>
     <script src="/static/js/upcoming_movies.js?v=10.6"></script>
     <script src="/static/js/upcoming_tv.js?v=1.3"></script>
-    <script src="/static/js/my_requests.js?v=1.3"></script>
+    <script src="/static/js/my_requests.js?v=1.4"></script>
     <script src="/static/js/trending.js?v=1.3"></script>
     <script src="/static/js/help.js?v=1.0"></script>
     <script src="/static/js/logs.js?v=10.2"></script>

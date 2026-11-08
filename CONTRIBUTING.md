@@ -70,7 +70,7 @@ People taking part in this project are expected to follow the [Code of Conduct](
 
 ## Security
 
-Do not open a public issue for a vulnerability. See [SECURITY.md](SECURITY.md).
+Do not open a public issue for a vulnerability. Follow the [security policy](https://github.com/ohallord/media-manager/security/policy).
 
 ## License
 

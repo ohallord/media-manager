@@ -31,6 +31,8 @@ class User(Base):
     # Bumped on every password change; JWTs carry it as "tv" and older values
     # are rejected, so a password change logs out every other session.
     token_version = Column(Integer, nullable=False, default=0)
+    # Email this user when one of their requests becomes available (My Requests toggle).
+    notify_on_available = Column(Boolean, nullable=False, default=True)
 
     passkeys = relationship("PasskeyCredential", back_populates="user", cascade="all, delete-orphan")
 
@@ -242,6 +244,23 @@ class ServiceHeartbeat(Base):
     version = Column(String(32), nullable=True)
     detail_json = Column(Text, nullable=True)
 
+
+
+class RequestNotification(Base):
+    """
+    One row per (user, requested title) the "your request is ready" sweep has
+    handled, so it emails at most once. The row with username "__baseline__"
+    marks when the sweep first ran: requests older than that are never emailed.
+    """
+    __tablename__ = "request_notifications"
+    __table_args__ = (Index("ix_request_notifications_user_key", "username", "dedupe_key", unique=True),)
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str)
+    username = Column(String(64), nullable=False)
+    dedupe_key = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=True)
+    emailed = Column(Boolean, nullable=False, default=False)
+    notified_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class TranscodeSettings(Base):

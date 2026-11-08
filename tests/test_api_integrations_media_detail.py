@@ -252,6 +252,114 @@ class TestApiMediaDetail(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["type"], "movie")
 
+    def _stub_movie(self, mock_tmdb_cls, belongs_to_collection=None, collection=None):
+        client_instance = mock_tmdb_cls.return_value
+        details = {
+            "id": 1, "title": "Part Two", "release_date": "2026-01-01",
+            "overview": "ov", "poster_path": "/p1.jpg", "vote_average": 7.5, "runtime": 120,
+            "genres": [], "credits": {"cast": []}, "videos": {"results": []},
+        }
+        if belongs_to_collection is not None:
+            details["belongs_to_collection"] = belongs_to_collection
+        client_instance.get_movie_details = AsyncMock(return_value=details)
+        client_instance.get_movie_recommendations = AsyncMock(return_value=[])
+        client_instance.get_similar_movies = AsyncMock(return_value=[])
+        client_instance.get_movie_watch_providers = AsyncMock(return_value=[])
+        client_instance.get_collection = AsyncMock(return_value=collection)
+        return client_instance
+
+    @patch("media_manager.web.api.integrations.TMDbClient")
+    def test_movie_detail_collection_progress(self, mock_tmdb_cls):
+        client_instance = self._stub_movie(
+            mock_tmdb_cls,
+            belongs_to_collection={"id": 77, "name": "Saga Collection"},
+            collection={"id": 77, "name": "Saga Collection", "parts": [
+                {"id": 4, "title": "Part Four", "release_date": "", "poster_path": None},
+                {"id": 1, "title": "Part Two", "release_date": "2026-01-01", "poster_path": "/p1.jpg"},
+                {"id": 3, "title": "Part Three", "release_date": "2028-05-01", "poster_path": "/p3.jpg"},
+                {"id": 2, "title": "Part One", "release_date": "2020-01-01", "poster_path": "/p2.jpg"},
+                {"id": None, "title": "Broken"},
+            ]},
+        )
+        app.dependency_overrides[get_async_db] = _make_upcoming_movies_db(
+            tmdb_config=_fake_config("tmdb"),
+            radarr_config=_fake_config("radarr"),
+            local_titles=["Part One"],
+        )
+        with patch("media_manager.web.api.integrations.RadarrClient") as mock_radarr_cls:
+            mock_radarr_cls.return_value.get_movies = AsyncMock(return_value=[{"tmdbId": 3}])
+            res = self.client.get("/api/v1/integrations/media-detail?tmdb_id=1&type=movie")
+
+        self.assertEqual(res.status_code, 200)
+        client_instance.get_collection.assert_awaited_once_with(77)
+        coll = res.json()["collection"]
+        self.assertEqual(coll["name"], "Saga Collection")
+        self.assertEqual(coll["total"], 4)
+        self.assertEqual(coll["owned_count"], 1)
+        self.assertEqual(coll["added_count"], 2)
+        self.assertEqual([p["tmdb_id"] for p in coll["parts"]], [2, 1, 3, 4])  # by date, undated last
+        by_id = {p["tmdb_id"]: p for p in coll["parts"]}
+        self.assertEqual(by_id[2]["status"], "in_library")
+        self.assertEqual(by_id[3]["status"], "in_radarr")
+        self.assertEqual(by_id[1]["status"], "not_added")
+        self.assertTrue(by_id[1]["is_current"])
+        self.assertFalse(by_id[2]["is_current"])
+        self.assertEqual(by_id[2]["year"], "2020")
+        self.assertIsNone(by_id[4]["year"])
+        self.assertIsNone(by_id[4]["poster_url"])
+        self.assertEqual(by_id[3]["poster_url"], "https://image.tmdb.org/t/p/w342/p3.jpg")
+
+    @patch("media_manager.web.api.integrations.TMDbClient")
+    def test_movie_detail_without_collection_skips_lookup(self, mock_tmdb_cls):
+        client_instance = self._stub_movie(mock_tmdb_cls)
+        app.dependency_overrides[get_async_db] = _make_upcoming_movies_db(tmdb_config=_fake_config("tmdb"))
+        res = self.client.get("/api/v1/integrations/media-detail?tmdb_id=1&type=movie")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.json()["collection"])
+        client_instance.get_collection.assert_not_called()
+
+    @patch("media_manager.web.api.integrations.TMDbClient")
+    def test_movie_detail_collection_lookup_failure_is_non_fatal(self, mock_tmdb_cls):
+        self._stub_movie(mock_tmdb_cls, belongs_to_collection={"id": 77}, collection=None)
+        app.dependency_overrides[get_async_db] = _make_upcoming_movies_db(tmdb_config=_fake_config("tmdb"))
+        res = self.client.get("/api/v1/integrations/media-detail?tmdb_id=1&type=movie")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.json()["collection"])
+
+    @patch("media_manager.web.api.integrations.TMDbClient")
+    def test_movie_detail_collection_with_no_usable_parts_is_null(self, mock_tmdb_cls):
+        self._stub_movie(
+            mock_tmdb_cls, belongs_to_collection={"id": 77},
+            collection={"id": 77, "name": "Empty", "parts": [{"id": 5}]},
+        )
+        app.dependency_overrides[get_async_db] = _make_upcoming_movies_db(tmdb_config=_fake_config("tmdb"))
+        res = self.client.get("/api/v1/integrations/media-detail?tmdb_id=1&type=movie")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.json()["collection"])
+
+    @patch("media_manager.web.api.integrations.TMDbClient")
+    def test_tv_detail_has_no_collection(self, mock_tmdb_cls):
+        client_instance = mock_tmdb_cls.return_value
+        client_instance.get_tv_details = AsyncMock(return_value={
+            "id": 10, "name": "Main Show", "episode_run_time": [], "genres": [],
+            "credits": {"cast": []}, "videos": {"results": []},
+            "belongs_to_collection": {"id": 77},
+        })
+        client_instance.get_tv_recommendations = AsyncMock(return_value=[])
+        client_instance.get_similar_tv = AsyncMock(return_value=[])
+        client_instance.get_tv_watch_providers = AsyncMock(return_value=[])
+        client_instance.get_tv_external_ids = AsyncMock(return_value=None)
+        client_instance.get_collection = AsyncMock(return_value=None)
+        app.dependency_overrides[get_async_db] = _make_upcoming_movies_db(tmdb_config=_fake_config("tmdb"))
+        res = self.client.get("/api/v1/integrations/media-detail?tmdb_id=10&type=tv")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(res.json()["collection"])
+        client_instance.get_collection.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
