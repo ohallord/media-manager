@@ -283,8 +283,9 @@ async def test_integration_connection(
             loop = asyncio.get_event_loop()
             healthy = await loop.run_in_executor(None, connect_smtp)
             return {"healthy": healthy, "service": "email"}
-        except Exception as e:
-            return {"healthy": False, "service": "email", "error": str(e)}
+        except Exception:
+            logger.warning("SMTP connection test failed", exc_info=True)
+            return {"healthy": False, "service": "email", "error": "SMTP connection failed"}
     else:
         raise HTTPException(status_code=400, detail="Invalid service")
 
@@ -3151,22 +3152,34 @@ def _allowed_media_roots():
     return roots
 
 
-def _is_allowed_local_image_path(path: str) -> bool:
-    """Reject path traversal: file must exist under a configured media/source dir."""
-    from pathlib import Path
+def _resolved_allowed_image_path(path: str) -> Optional[str]:
+    """Real path of a file that sits inside a configured media or source directory.
+
+    The query string is normalized with realpath before any file is opened, and
+    the opened path is that result. A sibling directory such as ``media-other``
+    does not match a root of ``media``, and a symlink that resolves outside the
+    root is rejected.
+    """
+    if not path or "\x00" in path:
+        return None
     try:
-        resolved = Path(path).resolve()
-    except Exception:
-        return False
-    if not resolved.is_file():
-        return False
+        resolved = os.path.realpath(path)
+    except (OSError, ValueError):
+        return None
     for root in _allowed_media_roots():
-        try:
-            resolved.relative_to(Path(root).resolve())
-            return True
-        except (ValueError, OSError):
+        if not root:
             continue
-    return False
+        try:
+            root_real = os.path.realpath(root)
+        except (OSError, ValueError):
+            continue
+        if not root_real:
+            continue
+        prefix = root_real if root_real.endswith(os.sep) else root_real + os.sep
+        if resolved.startswith(prefix):
+            if os.path.isfile(resolved):
+                return resolved
+    return None
 
 
 def _is_allowed_remote_image_url(url: str) -> bool:
@@ -3192,6 +3205,7 @@ async def image_proxy_cache(
     if not url:
         raise HTTPException(status_code=400, detail="URL parameter required")
 
+    local_image = None
     if url.startswith("http://") or url.startswith("https://"):
         if not _is_allowed_remote_image_url(url):
             raise HTTPException(status_code=400, detail="Image host is not allowed")
@@ -3199,7 +3213,8 @@ async def image_proxy_cache(
         target_file = url
         if url.startswith("/api/v1/integrations/serve-local-art?path="):
             target_file = unquote(url.split("path=", 1)[1])
-        if not _is_allowed_local_image_path(target_file):
+        local_image = _resolved_allowed_image_path(target_file)
+        if not local_image:
             raise HTTPException(status_code=404, detail="Image not found or failed to load")
 
     cache_key = hashlib.md5(f"{url}:{w}:{h}".encode("utf-8")).hexdigest()
@@ -3235,12 +3250,7 @@ async def image_proxy_cache(
         except Exception as e:
             logging.warning(f"imgproxy remote fetch failed for {url}: {e}")
     else:
-        # Local file path or /api/v1/integrations/serve-local-art path
-        target_file = url
-        if url.startswith("/api/v1/integrations/serve-local-art?path="):
-            target_file = unquote(url.split("path=", 1)[1])
-
-        image_bytes = await asyncio.to_thread(_read_file_bytes, target_file)
+        image_bytes = await asyncio.to_thread(_read_file_bytes, local_image)
 
     if not image_bytes:
         raise HTTPException(status_code=404, detail="Image not found or failed to load")
@@ -3269,17 +3279,18 @@ async def serve_local_art(path: str = Query(...)):
     """
     Serves a local image file safely from the filesystem with browser Cache-Control headers.
     """
-    if not path or not os.path.exists(path) or not os.path.isfile(path):
+    if not path:
         raise HTTPException(status_code=404, detail="Image file not found")
 
     ext = os.path.splitext(path)[1].lower()
     if ext not in [".jpg", ".jpeg", ".png", ".webp", ".gif"]:
         raise HTTPException(status_code=400, detail="Invalid image extension")
 
-    if not _is_allowed_local_image_path(path):
+    safe = _resolved_allowed_image_path(path)
+    if not safe:
         raise HTTPException(status_code=404, detail="Image file not found")
 
-    return FileResponse(path, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    return FileResponse(safe, headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 def _build_title_candidates(title: str, path: Optional[str] = None) -> Tuple[List[str], Optional[int]]:
     """

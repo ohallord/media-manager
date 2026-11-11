@@ -365,6 +365,7 @@ flowchart TD
 
 ## 12. Request-Handling Performance Notes
 
+- **Local image reads** (`/serve-local-art`, and `/imgproxy` when `url` is a filesystem path) call `os.path.realpath` and accept the file only when that path is inside a configured media or source directory. The handler opens the real path, so `..` segments and a symlink that leaves the root never become the file that is served.
 - **uvicorn runs a single process** (`main.py`'s `uvicorn.run(...)` has no
   `workers=`), so it's one event loop for every concurrent request. Any
   `async def` handler that does blocking work directly (file I/O, CPU-bound

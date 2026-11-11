@@ -86,5 +86,14 @@ class TestPlaybackSourcesForm(unittest.TestCase):
         self.assertEqual(result["empty"], [])
 
 
+class TestSearchEmptyStateEscaping(unittest.TestCase):
+    def test_empty_results_escape_the_search_term(self):
+        src = _read("js/media_search.js")
+        self.assertIn(
+            "const displayTerm = escapeHtml(data.term || document.getElementById('arr-search-input')?.value.trim() || '');",
+            src,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

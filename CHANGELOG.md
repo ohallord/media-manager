@@ -4,7 +4,16 @@ User-visible changes to Media Manager should be recorded here. The layout follow
 
 ## [Unreleased]
 
-No verified notes yet. Add a user-visible change here when it is ready to publish. Do not fill this section in from commit subjects or from tag names.
+### Changed
+
+- Filled in the response-time target (CONTRIBUTING), the backup-admin note (GOVERNANCE), and the vision and plans (ROADMAP).
+
+### Added
+
+- `GOVERNANCE.md`, `ROADMAP.md`, and `docs/THREAT_MODEL.md` (threat model and incident response).
+- A first-contribution section in `CONTRIBUTING.md`, and Discussions and security links in the issue chooser.
+- Dependabot updates for pip, Docker, and GitHub Actions.
+- A CI job that checks dependency licenses and uploads a CycloneDX SBOM.
 
 ## Version tags through v1.46.1
 

@@ -673,6 +673,55 @@ class TestServeLocalArt(BaseIntegrationsTest):
         finally:
             _os.remove(path)
 
+    def test_file_response_gets_realpath_without_dotdot(self):
+        import asyncio
+        import tempfile, os as _os
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _os.path.join(tmp, "library")
+            _os.makedirs(root)
+            image = _os.path.join(root, "poster.jpg")
+            with open(image, "wb") as f:
+                f.write(b"fake-jpeg-bytes")
+            raw = _os.path.join(root, "nested", "..", "poster.jpg")
+            with patch("media_manager.config.MEDIA_DIRECTORIES", [root]), \
+                 patch("media_manager.config.SOURCE_DIRECTORIES", []), \
+                 patch.object(integrations_module, "FileResponse") as mock_fr:
+                mock_fr.return_value = MagicMock()
+                asyncio.run(integrations_module.serve_local_art(path=raw))
+            served = mock_fr.call_args.args[0]
+            self.assertEqual(_os.path.realpath(served), _os.path.realpath(image))
+            self.assertNotIn("..", served)
+
+    def test_symlink_outside_media_root_is_404(self):
+        import tempfile, os as _os
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _os.path.join(tmp, "library")
+            _os.makedirs(root)
+            secret = _os.path.join(tmp, "secret.jpg")
+            with open(secret, "wb") as f:
+                f.write(b"secret")
+            link = _os.path.join(root, "link.jpg")
+            _os.symlink(secret, link)
+            with patch("media_manager.config.MEDIA_DIRECTORIES", [root]), \
+                 patch("media_manager.config.SOURCE_DIRECTORIES", []):
+                resp = self.client.get("/api/v1/integrations/serve-local-art", params={"path": link})
+            self.assertEqual(resp.status_code, 404)
+
+    def test_sibling_prefix_is_not_inside_media_root(self):
+        import tempfile, os as _os
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _os.path.join(tmp, "media")
+            _os.makedirs(root)
+            sibling = _os.path.join(tmp, "media-other")
+            _os.makedirs(sibling)
+            image = _os.path.join(sibling, "poster.jpg")
+            with open(image, "wb") as f:
+                f.write(b"jpeg")
+            with patch("media_manager.config.MEDIA_DIRECTORIES", [root]), \
+                 patch("media_manager.config.SOURCE_DIRECTORIES", []):
+                resp = self.client.get("/api/v1/integrations/serve-local-art", params={"path": image})
+            self.assertEqual(resp.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

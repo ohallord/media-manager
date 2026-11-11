@@ -1,5 +1,15 @@
 # Contributing to Media Manager
 
+## Your first contribution
+
+New here? Welcome. Start with an issue labeled [`good first issue`](https://github.com/ohallord/media-manager/labels/good%20first%20issue) or [`first timers only`](https://github.com/ohallord/media-manager/labels/first%20timers%20only). Comment on it so nobody else picks it up, and ask in [Discussions](https://github.com/ohallord/media-manager/discussions) if anything is unclear. Docs fixes are welcome too: look for the `documentation` label.
+
+## What to expect
+
+I aim to reply to new issues and pull requests within a week.
+
+Vulnerability reports follow the response times in the [security policy](https://github.com/ohallord/media-manager/security/policy). How decisions get made is in [GOVERNANCE.md](GOVERNANCE.md). What is planned, and what was decided against, is in [ROADMAP.md](ROADMAP.md).
+
 ## Set up
 
 You need Python 3.11, ffmpeg, and git. From a checkout:
@@ -39,6 +49,10 @@ helm lint k8s/helm --set-string secrets.JWT_SECRET=ci-only
 
 `ci-only` is the placeholder in that public workflow. It is not a credential you should reuse outside the lint.
 
+A second CI job checks that every dependency has a permissive or weak-copyleft license and builds a CycloneDX SBOM, which it uploads as the `sbom` artifact. A new dependency with a strong-copyleft license (GPL, AGPL) fails that job. Discuss it in an issue first.
+
+Pull requests need passing CI and one approving review before they merge.
+
 ## Repository layout
 
 | Path | Contents |
@@ -62,7 +76,7 @@ helm lint k8s/helm --set-string secrets.JWT_SECRET=ci-only
 
 Open a pull request on the public repository. Say what changed and how you tested it.
 
-For a change in behavior, open an issue first. Describe the problem, the approach, and what it means for an existing install.
+For a change in behavior, open an issue first. Describe the problem, the approach, and what it means for an existing install. Open a draft pull request for work in progress.
 
 ## Code of conduct
 

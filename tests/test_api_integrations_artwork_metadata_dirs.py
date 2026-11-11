@@ -148,19 +148,14 @@ class TestServeLocalArt(BaseIntegrationsTestCase):
         self.assertEqual(resp.status_code, 400)
 
     def test_valid_image_served(self):
-        with patch("os.path.exists", return_value=True), patch("os.path.isfile", return_value=True), \
-             patch("media_manager.web.api.integrations.FileResponse") as mock_file_response:
-            mock_file_response.return_value = "fake-response"
-            with patch.object(integrations_module.router, "get"):
-                pass
         # Exercise the real endpoint function directly to assert FileResponse is constructed correctly
         import asyncio
-        with patch("os.path.exists", return_value=True), patch("os.path.isfile", return_value=True), \
-             patch("media_manager.web.api.integrations.FileResponse") as mock_fr, \
-             patch.object(integrations_module, "_is_allowed_local_image_path", return_value=True):
+        with patch("media_manager.web.api.integrations.FileResponse") as mock_fr, \
+             patch.object(integrations_module, "_resolved_allowed_image_path", return_value="/tmp/poster.jpg"):
             mock_fr.return_value = MagicMock(status_code=200, headers={})
-            result = asyncio.run(integrations_module.serve_local_art(path="/tmp/poster.jpg"))
+            asyncio.run(integrations_module.serve_local_art(path="/tmp/poster.jpg"))
             mock_fr.assert_called_once()
+            self.assertEqual(mock_fr.call_args.args[0], "/tmp/poster.jpg")
             self.assertIn("Cache-Control", mock_fr.call_args.kwargs.get("headers", {}))
 
 

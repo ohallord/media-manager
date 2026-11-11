@@ -74,7 +74,7 @@ async function performUnifiedSearch() {
 function renderSearchResults(data, container) {
     const results = data.results || [];
     if (results.length === 0) {
-        const displayTerm = data.term || document.getElementById('arr-search-input')?.value.trim() || '';
+        const displayTerm = escapeHtml(data.term || document.getElementById('arr-search-input')?.value.trim() || '');
         container.innerHTML = `
             <div class="section-card" style="text-align: center;">
                 <h4>No results found for "${displayTerm}"</h4>
