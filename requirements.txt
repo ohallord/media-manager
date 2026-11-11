@@ -1,4 +1,4 @@
-fastapi>=0.109.0
+fastapi>=0.162.2
 uvicorn[standard]>=0.27.0
 sqlalchemy[asyncio]>=2.0.25,<2.1  # 2.1 made greenlet optional; [asyncio] pulls it in
 asyncpg>=0.29.0
