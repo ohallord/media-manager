@@ -1,4 +1,4 @@
-FROM python:3.11-slim as base
+FROM python:3.15-slim as base
 
 # Install system dependencies (ffmpeg for ffprobe, curl, git)
 RUN apt-get update && apt-get install -y --no-install-recommends \
