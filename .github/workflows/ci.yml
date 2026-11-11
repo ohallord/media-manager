@@ -28,3 +28,24 @@ jobs:
       - uses: azure/setup-helm@v4
       - name: Helm lint
         run: helm lint k8s/helm --set-string secrets.JWT_SECRET=ci-only
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt pip-licenses cyclonedx-bom
+      - name: License check (permissive and weak-copyleft only)
+        run: >-
+          pip-licenses --partial-match
+          --allow-only="MIT;BSD;Apache;ISC;PSF;Python Software Foundation;LGPL;Lesser General Public;MPL;Mozilla Public;Unlicense;CC0;0BSD;Zlib;HPND"
+      - name: SBOM (CycloneDX)
+        run: cyclonedx-py requirements requirements.txt -o sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json

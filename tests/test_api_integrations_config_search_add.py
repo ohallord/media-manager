@@ -289,7 +289,8 @@ class TestConnectionTest(_BaseIntegrationsTest):
             )
         data = response.json()
         self.assertFalse(data["healthy"])
-        self.assertIn("connection refused", data["error"])
+        self.assertEqual(data["error"], "SMTP connection failed")
+        self.assertNotIn("connection refused", data["error"])
 
     def test_invalid_service_rejected(self):
         app.dependency_overrides[get_async_db] = _make_routing_db()[0]
