@@ -111,7 +111,7 @@ H.265 worker run on the host and talk to the portal over HTTP.
 
 ## Quick start
 
-You need Python 3.11, ffmpeg, and git. Run the setup script from a clone:
+You need Python 3.11 or newer, ffmpeg, and git. Run the setup script from a clone:
 
 ```bash
 git clone https://github.com/ohallord/media-manager.git

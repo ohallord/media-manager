@@ -12,7 +12,7 @@ Vulnerability reports follow the response times in the [security policy](https:/
 
 ## Set up
 
-You need Python 3.11, ffmpeg, and git. From a checkout:
+You need Python 3.11 or newer, ffmpeg, and git. From a checkout:
 
 ```bash
 ./setup.sh
