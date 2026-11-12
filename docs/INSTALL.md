@@ -21,7 +21,7 @@ and integrations fit together.
 
 ## Prerequisites
 
-- **Python 3.10+**
+- **Python 3.11+** (the container image uses 3.15)
 - **ffmpeg** (provides `ffprobe`, used to read media file technical metadata)
 - **git**
 - Optional: **[FileBot](https://www.filebot.net/)** if you want the watcher to
