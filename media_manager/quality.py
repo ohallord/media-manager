@@ -19,6 +19,36 @@ def _is_cam_or_telesync_release(name: str) -> bool:
     return any(t in _CAM_TOKENS for t in tokens)
 
 
+_SEASON_DIR_RE = re.compile(r"^(season\s*\d+|specials)$", re.IGNORECASE)
+_SONARR_LOOSE_RE = re.compile(r"^(.+?)\s+-\s+\d{1,2}x\d{1,3}\b")
+
+
+def tv_series_name(path: str, title: str) -> str:
+    """Series name for a TV file, for duplicate grouping.
+
+    MediaItem.title for TV is whatever guessit found in the *filename*: the
+    episode title for files inside ``Show/Season N/`` folders, the show name
+    for loose ``Show - 4x02 - ...`` files. Grouping on it split one episode's
+    copies apart and merged different shows that share an episode title
+    ("Episode 2" S1E2), so group on the show instead.
+    """
+    parent = os.path.dirname(path)
+    if _SEASON_DIR_RE.match(os.path.basename(parent)):
+        show = os.path.basename(os.path.dirname(parent))
+        if show:
+            return show
+    m = _SONARR_LOOSE_RE.match(os.path.basename(path))
+    if m:
+        return m.group(1).strip()
+    return title
+
+
+def _series_key(name: str) -> str:
+    """Case- and punctuation-insensitive key; years and country tags are kept
+    so "Hostage (2023)" and "Hostage (2025)" never merge."""
+    return " ".join(re.split(r"[^0-9a-z]+", name.lower())).strip()
+
+
 def volume_is_healthy(volume: str) -> bool:
     """True when the volume path is a non-empty directory (mount looks present)."""
     try:
@@ -241,10 +271,18 @@ def update_duplicate_groups(protected_ids: Optional[Iterable[str]] = None):
 
         grouped: Dict[str, List[MediaItem]] = {}
 
+        display_names: Dict[str, str] = {}
         for item in items:
-            key = f"{item.media_type}:{item.title.lower()}"
-            if item.media_type == "tv":
-                key += f":S{item.season or 0}E{item.episode or 0}"
+            if item.media_type == "tv" and item.season is not None and item.episode is not None:
+                series = tv_series_name(item.path, item.title)
+                key = f"tv:{_series_key(series)}:S{item.season or 0}E{item.episode or 0}"
+                display_names.setdefault(key, series)
+            else:
+                # Unnumbered TV keeps the title (episode title) key: a series
+                # key would put every unnumbered episode of a show in one group.
+                key = f"{item.media_type}:{item.title.lower()}"
+                if item.media_type == "tv":
+                    key += f":S{item.season or 0}E{item.episode or 0}"
             grouped.setdefault(key, []).append(item)
 
         for key, group_items in grouped.items():
@@ -254,12 +292,13 @@ def update_duplicate_groups(protected_ids: Optional[Iterable[str]] = None):
                 best_item = group_items[0]
 
                 se_label = f"S{best_item.season:02d}E{best_item.episode:02d}" if best_item.media_type == "tv" and best_item.season is not None else "Movie"
+                group_title = display_names.get(key, best_item.title)
                 
                 dup_group = session.query(DuplicateGroup).filter_by(group_key=key).first()
                 if not dup_group:
                     dup_group = DuplicateGroup(
                         group_key=key,
-                        media_title=best_item.title,
+                        media_title=group_title,
                         season_episode=se_label,
                         best_media_id=best_item.id,
                         total_count=len(group_items)
@@ -270,7 +309,7 @@ def update_duplicate_groups(protected_ids: Optional[Iterable[str]] = None):
                     # next run.
                     session.flush()
                 else:
-                    dup_group.media_title = best_item.title
+                    dup_group.media_title = group_title
                     dup_group.season_episode = se_label
                     dup_group.best_media_id = best_item.id
                     dup_group.total_count = len(group_items)
@@ -278,10 +317,15 @@ def update_duplicate_groups(protected_ids: Optional[Iterable[str]] = None):
                 for item in group_items:
                     item.duplicate_group_id = dup_group.id
             else:
-                # Remove stale group if duplicates resolved
-                dup_group = session.query(DuplicateGroup).filter_by(group_key=key).first()
-                if dup_group:
-                    session.delete(dup_group)
+                for item in group_items:
+                    item.duplicate_group_id = None
+
+        # Drop groups whose key no longer has duplicates, including keys from
+        # an older grouping scheme that will never be produced again.
+        live_keys = {k for k, v in grouped.items() if len(v) > 1}
+        for dup_group in session.query(DuplicateGroup).all():
+            if dup_group.group_key not in live_keys:
+                session.delete(dup_group)
 
         session.commit()
         logger.info("Duplicate groups updated successfully.")

@@ -16,6 +16,8 @@ Scans all mounted media directories into SQLite/PostgreSQL, extracting technical
 
 Groups duplicate media files, ranks them by quality score (4K > 1080p, Atmos > TrueHD > DTS, bitrate tie-breaker), and highlights the best version.
 
+TV episodes are matched by show (from the show folder or the `Show - 1x02` filename) plus season and episode, so a loose download and the library copy group together, and different shows that share an episode title do not.
+
 ## Quality-based file mover
 
 Monitors source directories for new files. Verifies copy file size matching (`[COPY_VERIFIED]`) before safely truncating source files (`[SOURCE_TRUNCATED]`).

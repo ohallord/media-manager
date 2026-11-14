@@ -78,8 +78,8 @@ function renderDuplicatesView(data, container) {
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 0.75rem;">
                         <div>
                             <h4 style="font-size: 1.15rem; margin: 0; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                ${g.media_title} 
-                                <span class="badge badge-4k">${g.season_episode}</span>
+                                ${escapeHtml(g.media_title)}
+                                <span class="badge badge-4k">${escapeHtml(g.season_episode)}</span>
                             </h4>
                             <div class="muted" style="font-size: 0.82rem; margin-top: 2px;">Group ID: ${g.id} | ${g.total_count} total copies</div>
                         </div>

@@ -462,8 +462,16 @@ flowchart TD
 ---
 
 ### Duplicate groups
-`quality.update_duplicate_groups` groups by `media_type:title` (plus
-`SxxEyy` for TV), keeps the highest `quality_score` as `best_media_id`, and
+`quality.update_duplicate_groups` groups movies by `movie:title`. TV groups by
+`tv:<series>:SxxEyy`, where `quality.tv_series_name` takes the series from the
+show folder above `Season N/`/`Specials/`, else the `Show - 4x02 - ...` filename
+prefix, else the guessit title. `MediaItem.title` is the *episode* title for
+files in season folders, so keying TV on it split one episode's copies and
+merged different shows sharing an episode title ("Episode 2"). The series key
+is lowercased and punctuation-folded but keeps years/country tags, so
+`Hostage (2023)` and `Hostage (2025)` never merge (a missed duplicate is safe;
+a false one can delete the wrong file). Each run deletes every group whose key
+no longer has duplicates and unlinks singleton items. It keeps the highest `quality_score` as `best_media_id`, and
 flushes a new `DuplicateGroup` before linking items so they get its id on the
 same run (`tests/test_duplicate_group_first_link.py`).
 
