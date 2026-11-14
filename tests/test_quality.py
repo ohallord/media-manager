@@ -10,6 +10,7 @@ from media_manager.quality import (
     effective_bitrate,
     parse_path_qualities,
     calculate_quality_score,
+    tv_series_name,
     update_duplicate_groups,
     volume_is_healthy,
 )
@@ -424,9 +425,152 @@ class TestUpdateDuplicateGroups(unittest.TestCase):
 
         session = SyncSessionLocal()
         try:
-            group = session.query(DuplicateGroup).filter_by(group_key=f"tv:{title.lower()}:S1E1").first()
+            group = session.query(DuplicateGroup).filter_by(group_key="tv:ut duplicate test tv show:S1E1").first()
             self.assertIsNotNone(group)
             self.assertEqual(group.season_episode, "S01E01")
+        finally:
+            session.close()
+
+
+class TestTvSeriesName(unittest.TestCase):
+    def test_season_folder_uses_show_folder(self):
+        self.assertEqual(
+            tv_series_name("/mnt/TV/Tulsa King/Season 4/4x02 - Blind Rooster.mkv", "Blind Rooster"),
+            "Tulsa King",
+        )
+        self.assertEqual(tv_series_name("/mnt/TV/Show/Specials/0x01 - X.mkv", "X"), "Show")
+
+    def test_loose_sonarr_style_file_uses_prefix(self):
+        self.assertEqual(
+            tv_series_name("/mnt/TV/Tulsa King - 4x02 - Blind Rooster WEBRip-1080p.mkv", "Tulsa King"),
+            "Tulsa King",
+        )
+        self.assertEqual(
+            tv_series_name("/mnt/TV/12 12 12 - 1x02 - I Want My Halo Back WEBRip-1080p.mkv", "I Want My Halo Back"),
+            "12 12 12",
+        )
+
+    def test_loose_scene_file_falls_back_to_title(self):
+        self.assertEqual(tv_series_name("/mnt/TV/Ted.Lasso.2020.S04E02.1080p.mkv", "Ted Lasso"), "Ted Lasso")
+
+
+class TestTvDuplicateGrouping(unittest.TestCase):
+    """TV duplicates must group by series + S/E, not by episode title."""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.paths = []
+
+    def tearDown(self):
+        session = SyncSessionLocal()
+        try:
+            for path in self.paths:
+                session.query(MediaItem).filter_by(path=path).delete()
+            session.query(DuplicateGroup).filter(
+                DuplicateGroup.group_key.like("tv:ut %")
+            ).delete(synchronize_session=False)
+            session.commit()
+        finally:
+            session.close()
+        import shutil
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def _add(self, session, rel, title, score, season, episode):
+        path = os.path.join(self.root, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        open(path, "w").close()
+        self.paths.append(path)
+        session.add(MediaItem(
+            path=path, storage_volume=self.root, title=title, media_type="tv",
+            season=season, episode=episode, resolution="1080p", height=1080, width=1920,
+            video_codec="h264", audio_codec="aac", audio_channels=2, bitrate=1000,
+            size_bytes=1000, quality_score=score, file_created_at=datetime.utcnow(),
+        ))
+        return path
+
+    def _group_of(self, session, path):
+        return session.query(MediaItem).filter_by(path=path).one().duplicate_group_id
+
+    def test_season_folder_copy_and_loose_copy_are_one_group(self):
+        session = SyncSessionLocal()
+        try:
+            a = self._add(session, "_ut_Tulsa/Season 4/4x01 - W.W.D.D..mkv", "W.W.D.D.", 917, 4, 1)
+            b = self._add(session, "_ut_Tulsa - 4x01 - W.W.D.D WEBRip-1080p.mkv", "_ut_Tulsa", 523, 4, 1)
+            session.commit()
+        finally:
+            session.close()
+
+        update_duplicate_groups()
+
+        session = SyncSessionLocal()
+        try:
+            gid = self._group_of(session, a)
+            self.assertIsNotNone(gid)
+            self.assertEqual(gid, self._group_of(session, b))
+            group = session.get(DuplicateGroup, gid)
+            self.assertEqual(group.media_title, "_ut_Tulsa")
+            self.assertEqual(group.total_count, 2)
+        finally:
+            session.close()
+
+    def test_different_shows_with_same_episode_title_are_not_grouped(self):
+        session = SyncSessionLocal()
+        try:
+            a = self._add(session, "_ut_Hostage (2025)/Season 1/1x02 - Episode 2.mkv", "Episode 2", 900, 1, 2)
+            b = self._add(session, "_ut_The Body (2026)/Season 1/1x02 - Episode 2.mkv", "Episode 2", 500, 1, 2)
+            session.commit()
+        finally:
+            session.close()
+
+        update_duplicate_groups()
+
+        session = SyncSessionLocal()
+        try:
+            self.assertIsNone(self._group_of(session, a))
+            self.assertIsNone(self._group_of(session, b))
+        finally:
+            session.close()
+
+    def test_unnumbered_episodes_of_one_show_are_not_grouped(self):
+        session = SyncSessionLocal()
+        try:
+            a = self._add(session, "_ut_DateShow/Season 2024/Pilot.mkv", "Pilot", 900, None, None)
+            b = self._add(session, "_ut_DateShow/Season 2024/Finale.mkv", "Finale", 500, None, None)
+            c = self._add(session, "_ut_DateShow/Season 1/E05 - X.mkv", "X", 500, None, 5)
+            d = self._add(session, "_ut_DateShow/Season 2/E05 - Y.mkv", "Y", 400, None, 5)
+            session.commit()
+        finally:
+            session.close()
+
+        update_duplicate_groups()
+
+        session = SyncSessionLocal()
+        try:
+            for p in (a, b, c, d):
+                self.assertIsNone(self._group_of(session, p))
+        finally:
+            session.close()
+
+    def test_obsolete_groups_are_removed_and_items_unlinked(self):
+        session = SyncSessionLocal()
+        try:
+            old = DuplicateGroup(group_key="tv:episode 9 _ut_:S1E9", media_title="Episode 9",
+                                 season_episode="S01E09", best_media_id="x", total_count=2)
+            session.add(old)
+            session.flush()
+            a = self._add(session, "_ut_ShowA/Season 1/1x09 - Episode 9.mkv", "Episode 9", 900, 1, 9)
+            session.flush()
+            session.query(MediaItem).filter_by(path=a).one().duplicate_group_id = old.id
+            session.commit()
+        finally:
+            session.close()
+
+        update_duplicate_groups()
+
+        session = SyncSessionLocal()
+        try:
+            self.assertIsNone(session.query(DuplicateGroup).filter_by(group_key="tv:episode 9 _ut_:S1E9").first())
+            self.assertIsNone(self._group_of(session, a))
         finally:
             session.close()
 
